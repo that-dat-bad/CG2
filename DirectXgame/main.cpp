@@ -17,6 +17,37 @@ void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
 }
 
+//string<->wstring変換
+std::wstring ConvertString(const std::string& str) {
+	if (str.empty()) {
+		return std::wstring();
+	}
+
+	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
+	if (sizeNeeded == 0) {
+		return std::wstring();
+	}
+	std::wstring result(sizeNeeded, 0);
+	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
+	return result;
+}
+
+std::string ConvertString(const std::wstring& str) {
+	if (str.empty()) {
+		return std::string();
+	}
+
+	auto sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), NULL, 0, NULL, NULL);
+	if (sizeNeeded == 0) {
+		return std::string();
+	}
+	std::string result(sizeNeeded, 0);
+	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
+	return result;
+}
+
+
+
 // クライアント領域のサイズ
 const int32_t kClientWidth = 1280;
 const int32_t kClientHeight = 720;
@@ -84,7 +115,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//===================DX12=========================
 	
 	//DXGIファクトリーのポインタ変数を定義
-	IDXGIFactory* dxgiFactory = nullptr;
+	IDXGIFactory6* dxgiFactory = nullptr;
 	//DXGIファクトリーの生成
 	HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
 	//DXGIファクトリーの成否判定
@@ -104,7 +135,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// ソフトウェアアダプタでなければ採用!
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE)) {
 			// 採用したアダプタの情報をログに出力。wstringの方なので注意
-			Log(std::format(L"Use Adapater:{}\n", adapterDesc.Description));
+			Log(ConvertString(std::format(L"Use Adapater:{}\n", adapterDesc.Description)));
 			break;
 		}
 
@@ -126,9 +157,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	const char* featureLevelStrings[] = { "12.2", "12.1", "12.0" };
 	// 高い順に生成できるか試していく
-	for (size_t i = 0; i < _countof(featurelevels); ++i) {
+	for (size_t i = 0; i < _countof(featureLevels); ++i) {
 		// 採用したアダプターでデバイスを生成
-		hr D3D12CreateDevice(useAdapter, featureLevels[i], IID_PPV_ARGS(&device));
+		hr =D3D12CreateDevice(useAdapter, featureLevels[i], IID_PPV_ARGS(&device));
 		//指定した機能レベルでデバイスが生成できたかを確認
 		if (SUCCEEDED(hr)) {
 			// 生成できたのでログ出力を行ってループを抜ける
