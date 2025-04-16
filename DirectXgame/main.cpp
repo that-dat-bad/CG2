@@ -100,6 +100,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg,
 
 
 
+
+
+
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -277,6 +280,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	assert(SUCCEEDED(hr));
 
 
+	ID3D12Fence* fence = nullptr;
+	uint64_t fenceValue = 0;
+	hr = device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+	assert(SUCCEEDED(hr));
+
+	//Fencenosignalを持つためのイベントを作成
+	HANDLE fenceEvent = CreateEvent(NULL, false, false, NULL);
+	assert(fenceEvent != nullptr);
+
 	//スワップチェーンの生成
 	IDXGISwapChain4* swapChain = nullptr;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
@@ -377,7 +389,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		else {
 			//ゲームの処理
-			
+
 
 
 			//これから書き込むバックバッファのインデックスを取得
@@ -386,9 +398,31 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//描画先のRTVを設定
 			commandList->OMSetRenderTargets(1, &rtvHandles[backbufferIndex], false, nullptr);
 
+
+			//TransitionBarrierの設定
+			D3D12_RESOURCE_BARRIER barrier{};
+
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION; //トランジションバリア
+
+			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE; //フラグなし
+
+			barrier.Transition.pResource = swapChainResources[backbufferIndex]; //対象のリソース
+
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT; //遷移前の状態
+
+			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移後の状態
+
+			commandList->ResourceBarrier(1, &barrier); //バリアを設定
+
+
 			//指定した色で画面をクリア
 			float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };
 			commandList->ClearRenderTargetView(rtvHandles[backbufferIndex], clearColor, 0, nullptr);
+
+
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移前の状態
+			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT; //遷移後の状態
+			commandList->ResourceBarrier(1, &barrier); //バリアを設定
 
 			hr = commandList->Close();
 			//コマンドリストのクローズ失敗
@@ -396,10 +430,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//GPUにコマンドリストの実行を行わせる
 			ID3D12CommandList* commandLists[] = { commandList };
-			commandQueue->ExecuteCommandLists(1,commandLists);
+			commandQueue->ExecuteCommandLists(1, commandLists);
 
 			//GPUとOSに画面の交換を行うように通知する
 			swapChain->Present(1, 0);
+
+
+			//Fenceの値を更新
+			fenceValue++;
+
+			//GPUがここまでたどり着いたらFenceの値を代入
+			commandQueue->Signal(fence, fenceValue);
+
+			if (fence->GetCompletedValue() < fenceValue)
+			{
+				// 指定したSignalにたどりついていないので、たどり着くまで待つよう
+				fence->SetEventOnCompletion(fenceValue, fenceEvent);
+				// イベント待つ
+				WaitForSingleObject(fenceEvent, INFINITE);
+			}
 
 			//次のフレーム用のコマンドリストを準備
 			hr = commandAllocator->Reset();
