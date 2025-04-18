@@ -165,6 +165,22 @@ IDxcBlob* CompileShader(
 		//警告・エラーダメ絶対
 		assert(false);
 	}
+
+	//4.コンパイル結果を受け取って返す
+	IDxcBlob* shaderBlob = nullptr;
+	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
+
+	//コンパイル結果を受け取れなかったら止める
+	assert(SUCCEEDED(hr));
+
+	//成功したログを出す
+	Log(ConvertString(std::format(L"Compile Succeeded, Path :{}, profile : {}\n", filePath, profile)));
+	//解放
+	shaderSource->Release();
+	shaderResult->Release();
+
+	//実行用のバイナリを返す
+	return shaderBlob;
 };
 
 
