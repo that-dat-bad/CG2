@@ -7,6 +7,9 @@
 #include<format>
 #include<strsafe.h>
 
+#include <dxcapi.h>
+
+
 //debug用のヘッダ
 #include<DbgHelp.h>
 #pragma comment(lib, "Dbghelp.lib")
@@ -17,6 +20,7 @@
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 
+#pragma comment(lib,"dxcompiler.lib")
 
 //ログ用関数
 void Log(const std::string& message) {
@@ -103,6 +107,65 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg,
 
 
 
+
+
+IDxcBlob* CompileShader(
+	//コンパイルするシェーダーのファイルパス
+	const std::wstring& filePath,
+	//コンパイルに使用するプロファイル
+	const wchar_t* profile,
+	//初期化で生成したもの3つ
+	IDxcUtils* dxcUtils,
+	IDxcCompiler3* dxcCompiler,
+	IDxcIncludeHandler* includeHandler) {
+
+	//1.hlslファイルを読み込む
+	//これからシェーダーをコンパイルする旨をログに出力
+	Log(ConvertString(std::format(L"Begin CompileShader, Path :{}, profile : {}\n", filePath, profile)));
+
+	//hlslファイルを読み込む
+	IDxcBlobEncoding* shaderSource = nullptr;
+	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderSource);
+
+	//読めなかったら止める
+	assert(SUCCEEDED(hr));
+
+	//読み込んだファイルの内容を設定する
+	DxcBuffer shaderSourceBuffer{};
+	shaderSourceBuffer.Ptr = shaderSource->GetBufferPointer(); //バッファのポインタ
+	shaderSourceBuffer.Size = shaderSource->GetBufferSize(); //バッファのサイズ
+	shaderSourceBuffer.Encoding = DXC_CP_UTF8; //エンコーディングの種類(utf-8)
+
+	//2.コンパする
+	LPCWSTR arguments[] = {
+		filePath.c_str(), //コンパイルするファイルのパス
+		L"-E", L"main", //エントリーポイント
+		L"-T", profile, //プロファイル
+		L"-Zi", //デバッグ情報を出力
+		L"-Od", //最適化をしない
+		L"-Zpr",//メモリは行優先
+	};
+	IDxcResult* shaderResult = nullptr;
+	hr = dxcCompiler->Compile(
+		&shaderSourceBuffer, //コンパイルするシェーダーの情報
+		arguments, //コンパイルに使用する引数
+		_countof(arguments), //引数の数
+		includeHandler, //インクルードの諸々
+		IID_PPV_ARGS(&shaderResult) //結果を格納するポインタ
+	);
+	//dxcが起動できないなど致命的な状況
+	assert(SUCCEEDED(hr));
+
+	//3.コンパイル結果を取得する
+	IDxcBlobUtf8* shaderError = nullptr;
+	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&shaderError), nullptr);
+	if (shaderError!=nullptr && shaderError->GetStringLength()!=0)
+	{
+		Log(shaderError->GetStringPointer());
+		//警告・エラーダメ絶対
+		assert(false);
+	}
+};
 
 
 
@@ -292,6 +355,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	HANDLE fenceEvent = CreateEvent(NULL, false, false, NULL);
 	assert(fenceEvent != nullptr);
 
+	//dxCompilerの初期化
+	IDxcUtils* dxcUtils = nullptr;
+	IDxcCompiler3* dxcCompiler = nullptr;
+	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+	assert(SUCCEEDED(hr));
+
+	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
+	assert(SUCCEEDED(hr));
+
+	IDxcIncludeHandler* includeHandler = nullptr;
+	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
+	assert(SUCCEEDED(hr));
+
+
+
+
 	//スワップチェーンの生成
 	IDXGISwapChain4* swapChain = nullptr;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
@@ -466,7 +545,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	OutputDebugStringA("Hello, DirectX!\n");
 	IDXGIDebug1* debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
-		debug->ReportLiveObjects(DXGI_DEBUG_ALL,DXGI_DEBUG_RLO_ALL);
+		debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
 		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
 		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 		debug->Release();
