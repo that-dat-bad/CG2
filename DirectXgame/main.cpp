@@ -487,6 +487,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力レイアウトを許可
 
+	//RootSignatureのパラメータの設定(rootParameters)
+	D3D12_ROOT_PARAMETER rootParameter[1] = {};
+	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBV
+	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使用
+	rootParameter[0].Descriptor.ShaderRegister = 0; // レジスタ番号
+
+	descriptionRootSignature.pParameters = rootParameter;//ルートパラメーラ配列へのポインタ
+	descriptionRootSignature.NumParameters = _countof(rootParameter);//配列の長さ
+
 	ID3DBlob* signatureBlob = nullptr;
 	ID3DBlob* errorBlob = nullptr;
 	hr = D3D12SerializeRootSignature(&descriptionRootSignature,
