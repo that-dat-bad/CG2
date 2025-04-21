@@ -147,7 +147,7 @@ IDxcBlob* CompileShader(
 		filePath.c_str(), //コンパイルするファイルのパス
 		L"-E", L"main", //エントリーポイント
 		L"-T", profile, //プロファイル
-		L"-Zi", //デバッグ情報を出力
+		L"-Zi",L"-Qembed_debug",//デバッグ情報を埋め込む
 		L"-Od", //最適化をしない
 		L"-Zpr",//メモリは行優先
 	};
@@ -510,7 +510,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[1] = {};
 	inputElementDescs[0].SemanticName = "POSITION"; //セマンティクス名
 	inputElementDescs[0].SemanticIndex = 0; //セマンティクスのインデックス
-	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32_FLOAT; //データ形式
+	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //データ形式
 	inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT; //オフセット
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs; //セマンティクスの情報
@@ -555,7 +555,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	graphicPipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; //トポロジのタイプ
 	//どのように画面に色を打ち込むか
 	graphicPipelineStateDesc.SampleDesc.Count = 1;
-	graphicPipelineStateDesc.SampleMask = UINT_MAX;
+	graphicPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
 	//実際に生成
 	ID3D12PipelineState* graphicPipelineState = nullptr;
@@ -579,6 +579,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexResourceDesc.MipLevels = 1; 
 
 	vertexResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	vertexResourceDesc.SampleDesc.Count = 1; // サンプル数
+	vertexResourceDesc.SampleDesc.Quality = 0; //
 
 	//実際に頂点リソースを生成
 	ID3D12Resource* vertexResource = nullptr;
@@ -602,6 +604,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexData[0] = { -0.5f, -0.5f, 0.0f, 1.0f }; //頂点1
 	vertexData[1] = { 0.0f, 0.5f, 0.0f, 1.0f }; //頂点2
 	vertexData[2] = { 0.5f, -0.5f, 0.0f, 1.0f }; //頂点3
+
+	//ビューポート
+	D3D12_VIEWPORT viewport{};
+
+	//クライアント領域のサイズと一緒にして全体に表示
+	viewport.Width = kClientWidth;
+	viewport.Height = kClientHeight;
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.MinDepth = 0.0f;
+	viewport.MaxDepth = 1.0f;
+
+	//シザー矩形
+	D3D12_RECT scissorRect{};
+	//クライアント領域のサイズと一緒にして全体に表示
+	scissorRect.left = 0;
+	scissorRect.right = kClientWidth;
+	scissorRect.top = 0;
+	scissorRect.bottom = kClientHeight;
 
 	//頂点バッファビューを生成
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -657,9 +678,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->ClearRenderTargetView(rtvHandles[backbufferIndex], clearColor, 0, nullptr);
 
 
+			//コマンドを積む
+			commandList->RSSetViewports(1, &viewport); //ビューポートの設定
+			commandList->RSSetScissorRects(1, &scissorRect); //シザー矩形の設定
+			//ルートシグネチャを設定
+			commandList->SetGraphicsRootSignature(rootSignature);
+			commandList->SetPipelineState(graphicPipelineState); //PSOの設定
+			//頂点バッファビューを設定
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+			//形状を設定
+			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			//描画
+			commandList->DrawInstanced(3, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
+
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移前の状態
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT; //遷移後の状態
 			commandList->ResourceBarrier(1, &barrier); //バリアを設定
+
+
 
 			hr = commandList->Close();
 			//コマンドリストのクローズ失敗
@@ -694,49 +730,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
 
-			//ビューポート
-			D3D12_VIEWPORT viewport{};
 
-			//クライアント領域のサイズと一緒にして全体に表示
-			viewport.Width = kClientWidth;
-			viewport.Height = kClientHeight;
-			viewport.TopLeftX = 0;
-			viewport.TopLeftY = 0;
-			viewport.MinDepth = 0.0f;
-			viewport.MaxDepth = 1.0f;
 
-			//シザー矩形
-			D3D12_RECT scissorRect{};
-			//クライアント領域のサイズと一緒にして全体に表示
-			scissorRect.left = 0;
-			scissorRect.right = kClientWidth;
-			scissorRect.top = 0;
-			scissorRect.bottom = kClientHeight;
 
-			//コマンドを積む
-			commandList->RSSetViewports(1, &viewport); //ビューポートの設定
-			commandList->RSSetScissorRects(1, &scissorRect); //シザー矩形の設定
-			//ルートシグネチャを設定
-			commandList->SetGraphicsRootSignature(rootSignature);
-			commandList->SetPipelineState(graphicPipelineState); //PSOの設定
-			//頂点バッファビューを設定
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-			//形状を設定
-			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			//描画
-			commandList->DrawInstanced(3, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
 		}
 	}
 	//出力ウィンドウへの文字出力
-	OutputDebugStringA("Hello, DirectX!\n");
-	IDXGIDebug1* debug;
-	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
-		debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
-		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
-		debug->Release();
-	}
+	/*OutputDebugStringA("Hello, DirectX!\n");*/
+	//IDXGIDebug1* debug;
+	//if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
+	//	debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+	//	debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+	//	debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
+	//	debug->Release();
+	//}
 
+
+
+	CloseWindow(hwnd);
 	//解放処理
 	CloseHandle(fenceEvent);
 	fence->Release();
@@ -756,16 +767,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexResource->Release();
 	graphicPipelineState->Release();
 	signatureBlob->Release();
-	if (errorBlob) 
+	if (errorBlob)
 	{
 		errorBlob->Release();
 	}
 	rootSignature->Release();
 	pixelShaderBlob->Release();
 	vertexShaderBlob->Release();
-
-
-	CloseWindow(hwnd);
 
 	return 0;
 }
