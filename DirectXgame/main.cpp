@@ -28,6 +28,12 @@ void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
 }
 
+//Vector4の定義
+struct Vector4
+{
+	float x, y, z, w;
+};
+
 //string<->wstring変換
 std::wstring ConvertString(const std::string& str) {
 	if (str.empty()) {
@@ -588,7 +594,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	assert(SUCCEEDED(hr));
 
 	//頂点リソースにデータを書き込む
-	Vector4 vertexData = nullptr;;
+	Vector4* vertexData = nullptr;
 
 	//書き込むためのポインタを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
