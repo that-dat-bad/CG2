@@ -6,9 +6,8 @@
 #include<cassert>
 #include<format>
 #include<strsafe.h>
-
 #include <dxcapi.h>
-
+#include"Matrix4x4.h"
 
 //debug用のヘッダ
 #include<DbgHelp.h>
@@ -32,6 +31,14 @@ void Log(const std::string& message) {
 struct Vector4
 {
 	float x, y, z, w;
+};
+
+//Transformの定義
+struct Transform
+{
+	Vector3 scale; //拡縮
+	Vector3 rotate; //回転
+	Vector3 translate; //移動
 };
 
 //string<->wstring変換
@@ -140,9 +147,7 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
-// クライアント領域のサイズ
-const int32_t kClientWidth = 1280;
-const int32_t kClientHeight = 720;
+
 
 //ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg,
@@ -236,6 +241,16 @@ IDxcBlob* CompileShader(
 	//実行用のバイナリを返す
 	return shaderBlob;
 };
+
+
+//===================変数の初期化=========================
+// クライアント領域のサイズ
+const int32_t kClientWidth = 1280;
+const int32_t kClientHeight = 720;
+
+//transform
+Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
 
 
 
@@ -536,13 +551,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力レイアウトを許可
 
 	//RootSignatureのパラメータの設定(rootParameter)
-	D3D12_ROOT_PARAMETER rootParameter[1] = {};
-	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBV
-	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使用
-	rootParameter[0].Descriptor.ShaderRegister = 0; // レジスタ番号
+	D3D12_ROOT_PARAMETER rootParameters[2] = {};
+	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBV
+	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使用
+	rootParameters[0].Descriptor.ShaderRegister = 0; // レジスタ番号
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBV
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // 頂点シェーダーで使用
+	rootParameters[1].Descriptor.ShaderRegister = 1; // レジスタ番号
 
-	descriptionRootSignature.pParameters = rootParameter;//ルートパラメーラ配列へのポインタ
-	descriptionRootSignature.NumParameters = _countof(rootParameter);//配列の長さ
+	descriptionRootSignature.pParameters = rootParameters;//ルートパラメーラ配列へのポインタ
+	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
 
 	ID3DBlob* signatureBlob = nullptr;
 	ID3DBlob* errorBlob = nullptr;
@@ -664,7 +682,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexData[1] = { 0.0f, 0.5f, 0.0f, 1.0f }; //頂点2
 	vertexData[2] = { 0.5f, -0.5f, 0.0f, 1.0f }; //頂点3
 
-
+	//================マテリアル=========================
 	//マテリアルリソースの初期化
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
 
@@ -678,6 +696,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 
 
+
+	//==================transformMatrix用のResource=========================
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+
+	//データを書き込む
+	Matrix4x4* wvpData = nullptr;
+
+	//書き込むためのポインタを取得
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+
+	//行列の初期化(単位行列を書き込む)
+	*wvpData = Identity4x4();
+
+	//=================ビューポート=========================
 	//ビューポート
 	D3D12_VIEWPORT viewport{};
 
@@ -719,7 +751,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			DispatchMessage(&msg);
 		}
 		else {
-			//ゲームの処理
+			//==================================================
+			//===================ゲームの処理===================
+			//==================================================
+			transform.rotate.y += 0.03f;
+			Matrix4x4 worldMatrix = MakeAffineMatrix(
+				transform.scale,
+				transform.rotate,
+				transform.translate
+			);
+			Matrix4x4 cameraMatrix = MakeAffineMatrix(
+				cameraTransform.scale,
+				cameraTransform.rotate,
+				cameraTransform.translate
+			);
+			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
+			Matrix4x4 projectionMatrix = MakePerspectiveMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+
+			*wvpData = worldViewProjectionMatrix;
+
 
 
 
@@ -764,6 +815,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//CBVを設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+
+			//wvp用のCBufferを設定
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			//描画
 			commandList->DrawInstanced(3, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
