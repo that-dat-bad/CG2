@@ -838,47 +838,31 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-			//これから書き込むバックバッファのインデックスを取得
 			UINT backbufferIndex = swapChain->GetCurrentBackBufferIndex();
-			ImGui::ShowDemoWindow();
 
-
-			// ImGuiの内部コマンドを生成する
-			ImGui::Render();
-
-			ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap };
-			commandList->SetDescriptorHeaps(1, descriptorHeaps);
-			// ImGuiの描画コマンドをコマンドリストに積む
-			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
-
-
-
+			//ResourceBarrier: Present → RenderTarget
+			D3D12_RESOURCE_BARRIER barrier{};
+			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+			barrier.Transition.pResource = swapChainResources[backbufferIndex];
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			commandList->ResourceBarrier(1, &barrier);
 
 			//描画先のRTVを設定
 			commandList->OMSetRenderTargets(1, &rtvHandles[backbufferIndex], false, nullptr);
 
-
-			//TransitionBarrierの設定
-			D3D12_RESOURCE_BARRIER barrier{};
-
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION; //トランジションバリア
-
-			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE; //フラグなし
-
-			barrier.Transition.pResource = swapChainResources[backbufferIndex]; //対象のリソース
-
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT; //遷移前の状態
-
-			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移後の状態
-
-			commandList->ResourceBarrier(1, &barrier); //バリアを設定
-
-
-			//指定した色で画面をクリア
-			float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };
+			//画面をクリア
+			float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
 			commandList->ClearRenderTargetView(rtvHandles[backbufferIndex], clearColor, 0, nullptr);
 
-
+			//ImGuiフレーム描画
+			ImGui::ShowDemoWindow();
+			ImGui::Render();
+			ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap };
+			commandList->SetDescriptorHeaps(1, descriptorHeaps);
+			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 
 			//コマンドを積む
 			commandList->RSSetViewports(1, &viewport); //ビューポートの設定
