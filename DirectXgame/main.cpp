@@ -63,6 +63,54 @@ std::string ConvertString(const std::wstring& str) {
 	return result;
 }
 
+
+/// <summary>
+/// resource作成関数
+/// </summary>
+/// <param name="device"></param>
+/// <param name="sizeInBytes">サイズ</param>
+/// <returns></returns>
+ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
+	// ヒーププロパティの設定
+	D3D12_HEAP_PROPERTIES heapProperties = {};
+	heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // アップロード用ヒープ
+	heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProperties.CreationNodeMask = 1;
+	heapProperties.VisibleNodeMask = 1;
+
+	// リソースの設定
+	D3D12_RESOURCE_DESC resourceDesc = {};
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; // バッファリソース
+	resourceDesc.Alignment = 0;
+	resourceDesc.Width = sizeInBytes; // バッファのサイズ
+	resourceDesc.Height = 1;
+	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.MipLevels = 1;
+	resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.SampleDesc.Quality = 0;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR; // 行優先
+	resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+	// リソースの作成
+	ID3D12Resource* bufferResource = nullptr;
+	HRESULT hr = device->CreateCommittedResource(
+		&heapProperties, // ヒーププロパティ
+		D3D12_HEAP_FLAG_NONE, // ヒープフラグ
+		&resourceDesc, // リソースの設定
+		D3D12_RESOURCE_STATE_GENERIC_READ, // 初期状態
+		nullptr, // クリア値（バッファには不要）
+		IID_PPV_ARGS(&bufferResource) // 作成されたリソースを受け取る
+	);
+
+	// 作成失敗時のエラーチェック
+	assert(SUCCEEDED(hr) && "Failed to create buffer resource");
+
+	return bufferResource;
+}
+
+
 //===================crashHandler=========================
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
@@ -487,7 +535,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT; //入力レイアウトを許可
 
-	//RootSignatureのパラメータの設定(rootParameters)
+	//RootSignatureのパラメータの設定(rootParameter)
 	D3D12_ROOT_PARAMETER rootParameter[1] = {};
 	rootParameter[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBV
 	rootParameter[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使用
@@ -604,6 +652,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//頂点リソースの生成失敗
 	assert(SUCCEEDED(hr));
 
+
+
 	//頂点リソースにデータを書き込む
 	Vector4* vertexData = nullptr;
 
@@ -613,6 +663,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexData[0] = { -0.5f, -0.5f, 0.0f, 1.0f }; //頂点1
 	vertexData[1] = { 0.0f, 0.5f, 0.0f, 1.0f }; //頂点2
 	vertexData[2] = { 0.5f, -0.5f, 0.0f, 1.0f }; //頂点3
+
+
+	//マテリアルリソースの初期化
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
+
+	//マテリアルにデータを書き込む
+	Vector4* materialData = nullptr;
+
+	//書き込むためのポインタを取得
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+
+	//赤を書き込んでみる
+	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+
 
 	//ビューポート
 	D3D12_VIEWPORT viewport{};
@@ -697,6 +761,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 			//形状を設定
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			//CBVを設定
+			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+
 			//描画
 			commandList->DrawInstanced(3, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
 
@@ -783,6 +851,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootSignature->Release();
 	pixelShaderBlob->Release();
 	vertexShaderBlob->Release();
+	materialResource->Release();
 
 	return 0;
 }
