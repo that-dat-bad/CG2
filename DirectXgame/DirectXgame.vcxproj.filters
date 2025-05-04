@@ -53,6 +53,7 @@
     <None Include=".editorconfig">
       <Filter>リソース ファイル</Filter>
     </None>
+    <None Include="Object3d.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.VS.hlsl" />
