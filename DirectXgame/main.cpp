@@ -161,6 +161,39 @@ ID3D12DescriptorHeap* CreateDescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTO
 	return descriptorHeap;
 }
 
+ID3D12Resource* CreateDepthStenceilTextureResource(ID3D12Device* device, int32_t width, int32_t) 
+{
+	//1.リソースの設定
+	D3D12_RESOURCE_DESC resourceDesc = {};
+	resourceDesc.Width = width; // テクスチャの幅
+	resourceDesc.Height = width; // テクスチャの高さ
+	resourceDesc.MipLevels = 1; // ミップレベルの数
+	resourceDesc.DepthOrArraySize = 1; // 深度または配列サイズ
+	resourceDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; // フォーマット
+	resourceDesc.SampleDesc.Count = 1; // サンプル数
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D; // テクスチャの次元(2次元)
+	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL; // 深度ステンシル用のフラグ
+	//2.ヒープの設定
+	D3D12_HEAP_PROPERTIES heapProperties = {};
+	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT; // VRAM上に作る
+	//3.深度値のクリア最適化設定
+	D3D12_CLEAR_VALUE depthClearValue = {};
+	depthClearValue.DepthStencil.Depth = 1.0f; // 深度クリア値
+	depthClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//フォーマット(Resourceと合わせる)
+	//4.リソースの生成
+	ID3D12Resource* resource = nullptr;
+	HREFTYPE hr = device->CreateCommittedResource(
+		&heapProperties, // ヒーププロパティ
+		D3D12_HEAP_FLAG_NONE, // ヒープフラグ
+		&resourceDesc, // リソースの設定
+		D3D12_RESOURCE_STATE_DEPTH_WRITE, // 初期状態
+		&depthClearValue, // クリア値
+		IID_PPV_ARGS(&resource) // 作成されたリソースを受け取る
+	);
+	assert(SUCCEEDED(hr));
+
+	return resource;
+}
 
 //===================crashHandler=========================
 
@@ -708,6 +741,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	assert(SUCCEEDED(hr));
 
 
+	//====================depthStencil=========================
+	ID3D12Resource* depthStencilResource = CreateDepthStenceilTextureResource(device, kClientWidth, kClientHeight);
+
 	//====================PSO=========================
 
 
@@ -841,7 +877,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//バッファリソース
 	vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; //バッファリソース
-	vertexResourceDesc.Width = sizeof(VertexData) * 3;//バッファのサイズ
+	vertexResourceDesc.Width = sizeof(VertexData) * 6;//バッファのサイズ
 
 	//バッファはすべて1
 	vertexResourceDesc.Height = 1;
@@ -890,6 +926,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexData[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
 	vertexData[2].texcoord = { 1.0f,1.0f };
 
+	vertexData[3].position = { -0.5f, -0.5f, 0.5f, 1.0f };
+	vertexData[3].texcoord = { 0.0f,1.0f };
+	vertexData[4].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexData[4].texcoord = { 0.5f,0.0f };
+	vertexData[5].position = { 0.5f, -0.5f, -0.5f, 1.0f };
+	vertexData[5].texcoord = { 1.0f,1.0f };
+
 	//================マテリアル=========================
 	//マテリアルリソースの初期化
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
@@ -928,32 +971,32 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
 
 	//intermediateResourceをReleasする
-    ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
+	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
 
-    // commandList を Close
-    commandList->Close();
+	// commandList を Close
+	commandList->Close();
 
-    // キックする
-    ID3D12CommandList* commandLists[] = { commandList };
-    commandQueue->ExecuteCommandLists(1, commandLists);
+	// キックする
+	ID3D12CommandList* commandLists[] = { commandList };
+	commandQueue->ExecuteCommandLists(1, commandLists);
 
-    // 実行を待つ
-    fenceValue++;
-    commandQueue->Signal(fence, fenceValue);
-    if (fence->GetCompletedValue() < fenceValue) {
-        fence->SetEventOnCompletion(fenceValue, fenceEvent);
-        WaitForSingleObject(fenceEvent, INFINITE);
-    }
+	// 実行を待つ
+	fenceValue++;
+	commandQueue->Signal(fence, fenceValue);
+	if (fence->GetCompletedValue() < fenceValue) {
+		fence->SetEventOnCompletion(fenceValue, fenceEvent);
+		WaitForSingleObject(fenceEvent, INFINITE);
+	}
 
-    // allocator と commandList を Reset して次のコマンドを積めるようにする
-    hr = commandAllocator->Reset();
-    assert(SUCCEEDED(hr) && "Failed to reset command allocator");
+	// allocator と commandList を Reset して次のコマンドを積めるようにする
+	hr = commandAllocator->Reset();
+	assert(SUCCEEDED(hr) && "Failed to reset command allocator");
 
-    hr = commandList->Reset(commandAllocator, nullptr);
-    assert(SUCCEEDED(hr) && "Failed to reset command list");
+	hr = commandList->Reset(commandAllocator, nullptr);
+	assert(SUCCEEDED(hr) && "Failed to reset command list");
 
-    // intermediateResource を Release する
-    intermediateResource->Release();
+	// intermediateResource を Release する
+	intermediateResource->Release();
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 	srvDesc.Format = metadata.format;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -995,7 +1038,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress(); //リソースの先頭アドレス
 
 	//使用するリソースのサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 3;
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
 
 	//1つの頂点のサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
@@ -1117,7 +1160,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//SRVのDescriptorTableの先頭設定,2はRootParameter[2]
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			//描画
-			commandList->DrawInstanced(3, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
+			commandList->DrawInstanced(6, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
 
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移前の状態
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT; //遷移後の状態
