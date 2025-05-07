@@ -443,6 +443,7 @@ const int32_t kClientHeight = 720;
 //transform
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
+Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 //imgui用
 //色を保持
@@ -927,6 +928,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	assert(SUCCEEDED(hr));
 
 
+	//Sprite用の頂点リソース
+	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
 
 	//頂点リソースにデータを書き込む(旧)
 	//Vector4* vertexData = nullptr;
@@ -958,6 +961,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexData[5].position = { 0.5f, -0.5f, -0.5f, 1.0f };
 	vertexData[5].texcoord = { 1.0f,1.0f };
 
+	//頂点リソースにデータを書き込む(スプライト)
+	VertexData* vertexDataSprite = nullptr;
+	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+
+	vertexDataSprite[0].position = { -0.0f, 360.0f, 0.0f, 1.0f };
+	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
+	vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[2].position = { 640.0f, 360.0f, 0.0f, 1.0f };
+	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[3].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[4].position = { 640.0f, 0.0f, 0.0f, 1.0f };
+	vertexDataSprite[4].texcoord = { 1.0f,0.0f };
+	vertexDataSprite[5].position = { 640.0f, 360.0f, 0.0f, 1.0f };
+	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
+
 	//================マテリアル=========================
 	//マテリアルリソースの初期化
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
@@ -985,6 +1005,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//行列の初期化(単位行列を書き込む)
 	*wvpData = Identity4x4();
 
+
+	ID3D12Resource* wvpResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	Matrix4x4* wvpDataSprite = nullptr;
+	wvpResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&wvpDataSprite));
+	*wvpDataSprite = Identity4x4();
 
 	//=================SRV用のデスクリプター=========================
 	//SRV用のデスクリプタヒープを生成
@@ -1059,6 +1084,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//頂点バッファビューを生成
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 
+
+
 	//リソースの先頭アドレスから使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress(); //リソースの先頭アドレス
 
@@ -1068,6 +1095,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//1つの頂点のサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
+	//スプライト用のバッファービューを生成
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
+	
+	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
+	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
 	//=====================ImGuiの初期化========================
 	IMGUI_CHECKVERSION();
@@ -1132,9 +1165,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			*wvpData = worldViewProjectionMatrix;
 
 
-
-
-
+			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(
+				transformSprite.scale,
+				transformSprite.rotate,
+				transformSprite.translate
+			);
+			Matrix4x4 viewMatrixSprite = Identity4x4();
+			Matrix4x4 projectionMatrixSprite = makeOrthographicmMatrix(
+				0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f
+			);
+			Matrix4x4 worldViewProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+			*wvpDataSprite = worldViewProjectionMatrixSprite;
 
 
 
@@ -1189,6 +1230,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			//描画
 			commandList->DrawInstanced(6, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
+
+
+			// 3Dオブジェクトの描画
+			commandList->DrawInstanced(6, 1, 0, 0); // インスタンス数、頂点数、インデックス、オフセット
+
+			// スプライトの描画
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite); // VBVを設定
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceSprite->GetGPUVirtualAddress()); // TransformationMatrixCBufferの場所を設定
+			commandList->DrawInstanced(6, 1, 0, 0); // 描画 (スプライト)
+
 
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移前の状態
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT; //遷移後の状態
