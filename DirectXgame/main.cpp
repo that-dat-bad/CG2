@@ -1135,6 +1135,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			*materialData = Vector4(colorRGB[0], colorRGB[1], colorRGB[2], 1.0f);
 			ImGui::End();
 
+			// ユーザー入力可能な移動量（staticで保持）
+			static float moveAmount = 5.0f;
+			ImGui::InputFloat("Move Amount", &moveAmount, 1.0f, 10.0f, "%.1f");
+
+			// 移動ボタン群
+			ImGui::Text("Move Sprite:");
+
+			if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.y -= moveAmount;
+			}
+			ImGui::SameLine();
+			if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.y += moveAmount;
+			}
+			ImGui::SameLine();
+			if (ImGui::ArrowButton("##left", ImGuiDir_Left)) {
+				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.x -= moveAmount;
+			}
+			ImGui::SameLine();
+			if (ImGui::ArrowButton("##right", ImGuiDir_Right)) {
+				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.x += moveAmount;
+			}
+
+
 			//==================================================
 			//===================ゲームの処理===================
 			//==================================================
