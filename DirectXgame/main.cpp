@@ -743,6 +743,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//====================depthStencil=========================
 	ID3D12Resource* depthStencilResource = CreateDepthStenceilTextureResource(device, kClientWidth, kClientHeight);
+	//DSV用のヒープでディスクリプタの数は1,DSVはshader内で触るものではないのでshaderVisbleはFalse
+	ID3D12DescriptorHeap* dsvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+	
+	//DSVの設定
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; //フォーマット(Resourceと合わせる)
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D; //2Dテクスチャとして書き込む
+	//DSVHeapの先頭にDSVを作成
+	device->CreateDepthStencilView(depthStencilResource, &dsvDesc,
+		dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
 	//====================PSO=========================
 
@@ -846,6 +857,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		L"ps_6_0", //コンパイルに使用するプロファイル
 		dxcUtils, dxcCompiler, includeHandler);
 
+	//DepthStencilStateの設定
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	//Depthの機能を有効化
+	depthStencilDesc.DepthEnable = true;
+	//書き込み
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	//比較関数はLessEqual　つまり近ければ描画
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+
+
+
+
 	//PSOの生成
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicPipelineStateDesc{};
 	graphicPipelineStateDesc.pRootSignature = rootSignature; //ルートシグネチャ
@@ -854,6 +877,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	graphicPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() }; //ピクセルシェーダー
 	graphicPipelineStateDesc.BlendState = blendDesc; //ブレンドステート
 	graphicPipelineStateDesc.RasterizerState = rasterizerDesc; //ラスタライザーステート
+	graphicPipelineStateDesc.DepthStencilState = depthStencilDesc; //デプスステンシルステート
+	graphicPipelineStateDesc.DSVFormat=DXGI_FORMAT_D24_UNORM_S8_UINT; //DSVのフォーマット
 	//書き込むRTVの情報
 	graphicPipelineStateDesc.NumRenderTargets = 1; //RTVの数
 	graphicPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //RTVの形式
@@ -1128,11 +1153,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->ResourceBarrier(1, &barrier);
 
 			//描画先のRTVを設定
-			commandList->OMSetRenderTargets(1, &rtvHandles[backbufferIndex], false, nullptr);
+			/*commandList->OMSetRenderTargets(1, &rtvHandles[backbufferIndex], false, nullptr);*/
+			//RTV,DSVを設定
+			commandList->OMSetRenderTargets(1, &rtvHandles[backbufferIndex], false, &dsvHandle);
 
 			//画面をクリア
 			float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
 			commandList->ClearRenderTargetView(rtvHandles[backbufferIndex], clearColor, 0, nullptr);
+			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			//ImGuiフレーム描画
 			ImGui::Render();
