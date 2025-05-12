@@ -34,11 +34,6 @@ Matrix4x4 MakeScaleMatrix(const Vector3& scale);
 //アフィン変換行列
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
-
-//座標変換
-Vector3 TransformV3(const Vector3& vector, const Matrix4x4& matrix);
-
-
 //透視投影行列
 Matrix4x4 MakePerspectiveMatrix(float fovY, float aspectRatio, float nearClip, float farClip);
 
