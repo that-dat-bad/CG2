@@ -195,6 +195,7 @@ ID3D12Resource* CreateDepthStenceilTextureResource(ID3D12Device* device, int32_t
 	return resource;
 }
 
+
 //===================crashHandler=========================
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
@@ -429,6 +430,27 @@ ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::Scratc
 	return intermediateResource;
 }
 
+/// <summary>
+/// imguiの角度更新
+/// </summary>
+/// <param name="vertexData"></param>
+/// <param name="angleDegrees"></param>
+void UpdateRotatedUV(VertexData* vertexData, float targetAngleDegrees) {
+	float angleRad = targetAngleDegrees * 3.14159265f / 180.0f;
+	float cosA = cosf(angleRad);
+	float sinA = sinf(angleRad);
+
+	for (int i = 0; i < 3; ++i) {
+		float u = vertexData[i].texcoord.x - 0.5f;
+		float v = vertexData[i].texcoord.y - 0.5f;
+
+		float uRot = u * cosA - v * sinA;
+		float vRot = u * sinA + v * cosA;
+
+		vertexData[i].texcoord.x = uRot + 0.5f;
+		vertexData[i].texcoord.y = vRot + 0.5f;
+	}
+}
 
 
 
@@ -1147,31 +1169,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//  Materialセクション
 			if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) {
-				static float uvTranslate[2] = { 0.0f, 0.0f };
 				static float uvRotate = 0.0f;
-				static float uvScale[2] = { 1.0f, 1.0f };
-				static float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };  // RGBA
-				static int lightingType = 0;
+				static float colorRGB[3] = { 1.0f, 1.0f, 1.0f };
 				static int textureIndex = 0;
 
-				const char* lightingItems[] = { "None", "Phong", "Blinn" }; // 例
 				const char* textureItems[] = {
-					"resources/checkerBoard.png",
+					"resources/uvChecker.png",
 					"resources/monsterBall.png",
-					"resources/uvChecker.png"
+					"resources/checkerBoard.png"
 				};
 
 				// UVTransform系
-				ImGui::SliderFloat2("UVTranslate", uvTranslate, -1.0f, 1.0f, "%.3f");
-				ImGui::SliderFloat("UVRotate", &uvRotate, -180.0f, 180.0f, "%.1f");
-				ImGui::SliderFloat2("UVScale", uvScale, 0.1f, 10.0f, "%.2f");
+				ImGui::SliderFloat("UVRotate", &uvRotate, -3.14f, 3.14f, "%.1f");
+				UpdateRotatedUV(vertexData, uvRotate);
 
-				// 色（RGBA）スライダー＋カラーピッカー
-				ImGui::ColorEdit4("color", color,
+				// 色スライダー＋カラーピッカー
+				ImGui::ColorEdit3("color", colorRGB,
 					ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_Uint8);
-
-				// ライティング方式の選択
-				ImGui::Combo("Lighting", &lightingType, lightingItems, IM_ARRAYSIZE(lightingItems));
+				*materialData = Vector4(colorRGB[0], colorRGB[1], colorRGB[2], 1.0f);
 
 				// テクスチャ選択
 				ImGui::Combo("Texture", &textureIndex, textureItems, IM_ARRAYSIZE(textureItems));
@@ -1188,10 +1203,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-			Log(std::format("Translate X: {:.2f}, Y: {:.2f}, Z: {:.2f}\n",
-				transform.translate.x,
-				transform.translate.y,
-				transform.translate.z));
+
 
 
 
