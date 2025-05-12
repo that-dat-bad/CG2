@@ -7,8 +7,13 @@
 #include "Renderer.h"
 #include "Scene.h"
 #include "MyMath.h"
-#include "External/ImGui.h"
-#include "External/DirectXTex.h"
+#include "./externals/imgui/imgui.h"
+#include "./externals/imgui/imgui_impl_dx12.h"
+#include "./externals/imgui/imgui_impl_win32.h"
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+#include "./externals/DirectXTex/DirectXTex.h"
+#include "./externals/DirectXTex/d3dx12.h"
 #include "Utils.h"
 
 class Engine {
