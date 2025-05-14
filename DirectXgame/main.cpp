@@ -465,14 +465,23 @@ const int32_t kClientWidth = 1280;
 const int32_t kClientHeight = 720;
 
 //transform
-Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+//Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
-
+Transform transform1{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{-0.0f,0.0f,0.0f} };
+Transform transform2{ {1.0f,1.0f,1.0f},{0.0f,0.7f,0.0f},{0.0f,0.5f,0.0f} };
 
 //imgui用
 //色を保持
 float colorRGB[3] = { 1.0f,1.0f,1.0f };
-
+// テクスチャファイル名リスト
+const char* texturePaths[] = {
+	"resources/uvChecker.png",
+	"resources/monsterBall.png",
+	"resources/checkerBoard.png"
+};
+const int kNumTextures = _countof(texturePaths);
+static int textureIndex1 = 0;
+static int textureIndex2 = 0;
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -1008,16 +1017,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialResource->Unmap(0, nullptr);
 
 	//==================transformMatrix用のResource=========================
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource1 = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource2 = CreateBufferResource(device, sizeof(Matrix4x4));
 
 	//データを書き込む
-	Matrix4x4* wvpData = nullptr;
+	Matrix4x4* wvpData1 = nullptr;
+	Matrix4x4* wvpData2 = nullptr;
 
 	//書き込むためのポインタを取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	wvpResource1->Map(0, nullptr, reinterpret_cast<void**>(&wvpData1));
+	wvpResource2->Map(0, nullptr, reinterpret_cast<void**>(&wvpData2));
 
 	//行列の初期化(単位行列を書き込む)
-	*wvpData = Identity4x4();
+	*wvpData1 = Identity4x4();
+	*wvpData2 = Identity4x4();
 
 
 	ID3D12Resource* wvpResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
@@ -1074,6 +1087,34 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
+
+	// テクスチャと中間リソース配列
+	ID3D12Resource* textureResources[kNumTextures];
+	ID3D12Resource* intermediateResources[kNumTextures];
+	// SRV作成位置のオフセット
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandlesCPU[kNumTextures];
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandlesGPU[kNumTextures];
+
+	for (int i = 0; i < kNumTextures; ++i) {
+		DirectX::ScratchImage mipImages = LoadTexture(texturePaths[i]);
+		const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+
+		textureResources[i] = CreateTextureResource(device, metadata);
+		intermediateResources[i] = UploadTextureData(textureResources[i], mipImages, device, commandList);
+
+		textureSrvHandlesCPU[i] = textureSrvHandleCPU;
+		textureSrvHandlesCPU[i].ptr += (i + 1) * device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		textureSrvHandlesGPU[i] = textureSrvHandleGPU;
+		textureSrvHandlesGPU[i].ptr += (i + 1) * device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+		srvDesc.Format = metadata.format;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+
+		device->CreateShaderResourceView(textureResources[i], &srvDesc, textureSrvHandlesCPU[i]);
+	}
 
 	//=================ビューポート=========================
 	//ビューポート
@@ -1153,19 +1194,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				// モデル作成処理
 			}
 
-			//  Objectセクション
-			if (ImGui::CollapsingHeader("Object", ImGuiTreeNodeFlags_DefaultOpen)) {
-				static float translate[3] = { 0.0f, 0.0f, 0.0f };
-				static float rotate[3] = { 0.0f, 0.0f, 0.0f };
-				static float scale[3] = { 1.0f, 1.0f, 1.0f };
+			// Object1 セクション
+			if (ImGui::CollapsingHeader("Object1", ImGuiTreeNodeFlags_DefaultOpen)) {
+				static float translate1[3] = { transform1.translate.x, transform1.translate.y, transform1.translate.z };
+				static float rotate1[3] = { transform1.rotate.x, transform1.rotate.y, transform1.rotate.z };
+				static float scale1[3] = { transform1.scale.x, transform1.scale.y, transform1.scale.z };
 
-				ImGui::SliderFloat3("Translate", translate, -1.0f, 1.0f, "%.2f");
-				ImGui::SliderFloat3("Rotate", rotate, -3.14f, 3.14f, "%.2f");
-				ImGui::SliderFloat3("Scale", scale, 0.1f, 10.0f, "%.2f");
-				transform.translate = Vector3(translate[0], translate[1], translate[2]);
-				transform.rotate = Vector3(rotate[0], rotate[1], rotate[2]);
-				transform.scale = Vector3(scale[0], scale[1], scale[2]);
+				ImGui::SliderFloat3("Translate##1", translate1, -5.0f, 5.0f, "%.2f");
+				ImGui::SliderFloat3("Rotate##1", rotate1, -3.14f, 3.14f, "%.2f");
+				ImGui::SliderFloat3("Scale##1", scale1, 0.1f, 10.0f, "%.2f");
+
+				transform1.translate = { translate1[0], translate1[1], translate1[2] };
+				transform1.rotate = { rotate1[0], rotate1[1], rotate1[2] };
+				transform1.scale = { scale1[0], scale1[1], scale1[2] };
 			}
+
+			// Object2 セクション
+			if (ImGui::CollapsingHeader("Object2", ImGuiTreeNodeFlags_DefaultOpen)) {
+				static float translate2[3] = { transform2.translate.x, transform2.translate.y, transform2.translate.z };
+				static float rotate2[3] = { transform2.rotate.x, transform2.rotate.y, transform2.rotate.z };
+				static float scale2[3] = { transform2.scale.x, transform2.scale.y, transform2.scale.z };
+
+				ImGui::SliderFloat3("Translate##2", translate2, -5.0f, 5.0f, "%.2f");
+				ImGui::SliderFloat3("Rotate##2", rotate2, -3.14f, 3.14f, "%.2f");
+				ImGui::SliderFloat3("Scale##2", scale2, 0.1f, 10.0f, "%.2f");
+
+				transform2.translate = { translate2[0], translate2[1], translate2[2] };
+				transform2.rotate = { rotate2[0], rotate2[1], rotate2[2] };
+				transform2.scale = { scale2[0], scale2[1], scale2[2] };
+			}
+
 
 			//  Materialセクション
 			if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1189,7 +1247,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				*materialData = Vector4(colorRGB[0], colorRGB[1], colorRGB[2], 1.0f);
 
 				// テクスチャ選択
-				ImGui::Combo("Texture", &textureIndex, textureItems, IM_ARRAYSIZE(textureItems));
+				// Object1
+				
+				ImGui::Combo("Texture##1", &textureIndex1, texturePaths, kNumTextures);
+
+				// Object2
+				
+				ImGui::Combo("Texture##2", &textureIndex2, texturePaths, kNumTextures);
 			}
 
 
@@ -1210,10 +1274,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 			//transform.rotate.y += 0.03f;
-			Matrix4x4 worldMatrix = MakeAffineMatrix(
-				transform.scale,
-				transform.rotate,
-				transform.translate
+			Matrix4x4 worldMatrix1 = MakeAffineMatrix(
+				transform1.scale,
+				transform1.rotate,
+				transform1.translate
+			);
+
+			Matrix4x4 worldMatrix2 = MakeAffineMatrix(
+				transform2.scale,
+				transform2.rotate,
+				transform2.translate
 			);
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(
 				cameraTransform.scale,
@@ -1222,11 +1292,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			);
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
 			Matrix4x4 projectionMatrix = MakePerspectiveMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+			Matrix4x4 worldViewProjectionMatrix1 = Multiply(worldMatrix1, Multiply(viewMatrix, projectionMatrix));
+			Matrix4x4 worldViewProjectionMatrix2 = Multiply(worldMatrix2, Multiply(viewMatrix, projectionMatrix));
 
-			*wvpData = worldViewProjectionMatrix;
-
-
+			*wvpData1 = worldViewProjectionMatrix1;
+			*wvpData2 = worldViewProjectionMatrix2;
 
 
 
@@ -1272,19 +1342,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//形状を設定
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			//CBVを設定
+			
+
+			// Object1
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource1->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[textureIndex1]);
+			commandList->DrawInstanced(3, 1, 0, 0);
 
-			//wvp用のCBufferを設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-
-			//SRVのDescriptorTableの先頭設定,2はRootParameter[2]
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-			//描画
-			commandList->DrawInstanced(6, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
-
-
-
+			// Object2
+			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource2->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[textureIndex2]);
+			commandList->DrawInstanced(3, 1, 0, 0);
 
 
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移前の状態
