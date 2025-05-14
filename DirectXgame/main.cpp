@@ -1104,12 +1104,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//1つの頂点のサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
-	//スプライト用のバッファービューを生成
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
 
-	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
-	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
-	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
 
 	//=====================ImGuiの初期化========================
 	IMGUI_CHECKVERSION();
