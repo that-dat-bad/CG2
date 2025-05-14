@@ -16,6 +16,15 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{271769d9-4cec-46cb-8649-0c4c07a4d0c2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="window">
+      <UniqueIdentifier>{2e421247-f05a-4a9d-ae42-04e7ead5f2d4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="graphics">
+      <UniqueIdentifier>{6ea4bfce-4611-472e-b2ea-cd658b9fb147}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="math">
+      <UniqueIdentifier>{b1953bde-5d37-4057-8c44-5c50e6abf3f9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -47,6 +56,15 @@
     </ClCompile>
     <ClCompile Include="externals\imgui\imgui_demo.cpp">
       <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="window.cpp">
+      <Filter>window</Filter>
+    </ClCompile>
+    <ClCompile Include="renderer.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="math_utils.cpp">
+      <Filter>math</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -89,6 +107,15 @@
     </ClInclude>
     <ClInclude Include="externals\imgui\imstb_truetype.h">
       <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="window.h">
+      <Filter>window</Filter>
+    </ClInclude>
+    <ClInclude Include="renderer.h">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="math_utils.h">
+      <Filter>math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
