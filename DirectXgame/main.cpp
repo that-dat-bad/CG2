@@ -9,6 +9,8 @@
 #include <dxcapi.h>
 #include<vector>
 #include"Matrix4x4.h"
+#include<math.h>
+#define _USE_MATH_DEFINES
 
 
 
@@ -442,7 +444,7 @@ const int32_t kClientHeight = 720;
 
 //transform
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-5.0f} };
+Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-10.0f} };
 Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 //imgui用
@@ -903,7 +905,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//バッファリソース
 	vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; //バッファリソース
-	vertexResourceDesc.Width = sizeof(VertexData) * 6;//バッファのサイズ
+	vertexResourceDesc.Width = sizeof(VertexData) * 16*16*6;//バッファのサイズ
 
 	//バッファはすべて1
 	vertexResourceDesc.Height = 1;
@@ -946,6 +948,67 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//書き込むためのポインタを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+
+
+	//球の頂点データを生成
+	const int kSubdivision = 16; // 分割数
+	const float radius = 1.0f;
+	for (int latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+		float lat0 = float(latIndex) / kSubdivision * float(M_PI);
+		float lat1 = float(latIndex + 1) / kSubdivision * float(M_PI);
+		for (int lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+			float lon0 = float(lonIndex) / kSubdivision * float(2.0 * M_PI);
+			float lon1 = float(lonIndex + 1) / kSubdivision * float(2.0 * M_PI);
+
+			// 頂点インデックスの計算
+			uint32_t startIndex = (latIndex * kSubdivision + lonIndex) * 6;
+
+			// 球面上の4頂点
+			Vector3 p00 = {
+				radius * sinf(lat0) * cosf(lon0),
+				radius * cosf(lat0),
+				radius * sinf(lat0) * sinf(lon0)
+			};
+			Vector3 p10 = {
+				radius * sinf(lat1) * cosf(lon0),
+				radius * cosf(lat1),
+				radius * sinf(lat1) * sinf(lon0)
+			};
+			Vector3 p01 = {
+				radius * sinf(lat0) * cosf(lon1),
+				radius * cosf(lat0),
+				radius * sinf(lat0) * sinf(lon1)
+			};
+			Vector3 p11 = {
+				radius * sinf(lat1) * cosf(lon1),
+				radius * cosf(lat1),
+				radius * sinf(lat1) * sinf(lon1)
+			};
+
+			// UV座標
+			Vector2 uv00 = { float(lonIndex) / kSubdivision, float(latIndex) / kSubdivision };
+			Vector2 uv10 = { float(lonIndex) / kSubdivision, float(latIndex + 1) / kSubdivision };
+			Vector2 uv01 = { float(lonIndex + 1) / kSubdivision, float(latIndex) / kSubdivision };
+			Vector2 uv11 = { float(lonIndex + 1) / kSubdivision, float(latIndex + 1) / kSubdivision };
+
+			// 三角形1（CCW: p00 → p11 → p10）
+			vertexData[startIndex + 0].position = { p00.x, p00.y, p00.z, 1.0f };
+			vertexData[startIndex + 1].position = { p11.x, p11.y, p11.z, 1.0f };
+			vertexData[startIndex + 2].position = { p10.x, p10.y, p10.z, 1.0f };
+			// 三角形2（CCW: p00 → p01 → p11）
+			vertexData[startIndex + 3].position = { p00.x, p00.y, p00.z, 1.0f };
+			vertexData[startIndex + 4].position = { p01.x, p01.y, p01.z, 1.0f };
+			vertexData[startIndex + 5].position = { p11.x, p11.y, p11.z, 1.0f };
+			// UV座標の設定
+			vertexData[startIndex + 0].texcoord = { uv00.x, uv00.y };
+			vertexData[startIndex + 1].texcoord = { uv11.x, uv11.y };
+			vertexData[startIndex + 2].texcoord = { uv10.x, uv10.y };
+			vertexData[startIndex + 3].texcoord = { uv00.x, uv00.y };
+			vertexData[startIndex + 4].texcoord = { uv01.x, uv01.y };
+			vertexData[startIndex + 5].texcoord = { uv11.x, uv11.y };
+		}
+	}
+
 
 	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
 	vertexData[0].texcoord = { 0.0f,1.0f };
@@ -1090,7 +1153,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress(); //リソースの先頭アドレス
 
 	//使用するリソースのサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 16*16*6;
 
 	//1つの頂点のサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
@@ -1252,12 +1315,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//SRVのDescriptorTableの先頭設定,2はRootParameter[2]
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-			//描画
-			commandList->DrawInstanced(6, 1, 0, 0); //インスタンス数、頂点数、インデックス、オフセット
+
 
 
 			// 3Dオブジェクトの描画
-			commandList->DrawInstanced(6, 1, 0, 0); // インスタンス数、頂点数、インデックス、オフセット
+			commandList->DrawInstanced(1536, 1, 0, 0); // インスタンス数、頂点数、インデックス、オフセット
 
 			// スプライトの描画
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite); // VBVを設定
