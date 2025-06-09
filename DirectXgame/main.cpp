@@ -102,6 +102,36 @@ std::string ConvertString(const std::wstring& str) {
 	return result;
 }
 
+/// <summary>
+/// DescriptorHandleのCPUハンドルを取得する関数
+/// </summary>
+/// <param name="descriptorHeap"></param>
+/// <param name="descriptorSize"></param>
+/// <param name="index"></param>
+/// <returns></returns>
+D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index) {
+	// ヒープのCPUハンドルを取得
+	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	// インデックス分オフセット
+	handleCPU.ptr += (descriptorSize * index);
+	return handleCPU;
+}
+
+
+/// <summary>
+/// DescriptorHandleのGPUハンドルを取得する関数
+/// </summary>
+/// <param name="descriptorHeap"></param>
+/// <param name="descriptorSize"></param>
+/// <param name="index"></param>
+/// <returns></returns>
+D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index) {
+	// ヒープのGPUハンドルを取得
+	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	// インデックス分オフセット
+	handleGPU.ptr += (descriptorSize * index);
+	return handleGPU;
+}
 
 /// <summary>
 /// resource作成関数
@@ -163,7 +193,7 @@ ID3D12DescriptorHeap* CreateDescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTO
 	return descriptorHeap;
 }
 
-ID3D12Resource* CreateDepthStenceilTextureResource(ID3D12Device* device, int32_t width, int32_t) 
+ID3D12Resource* CreateDepthStenceilTextureResource(ID3D12Device* device, int32_t width, int32_t)
 {
 	//1.リソースの設定
 	D3D12_RESOURCE_DESC resourceDesc = {};
@@ -451,6 +481,8 @@ Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 //色を保持
 float colorRGB[3] = { 1.0f,1.0f,1.0f };
 
+//テクスチャ切り替え
+bool useMonsterBall = true;
 
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -748,7 +780,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12Resource* depthStencilResource = CreateDepthStenceilTextureResource(device, kClientWidth, kClientHeight);
 	//DSV用のヒープでディスクリプタの数は1,DSVはshader内で触るものではないのでshaderVisbleはFalse
 	ID3D12DescriptorHeap* dsvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
-	
+
 	//DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; //フォーマット(Resourceと合わせる)
@@ -881,7 +913,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	graphicPipelineStateDesc.BlendState = blendDesc; //ブレンドステート
 	graphicPipelineStateDesc.RasterizerState = rasterizerDesc; //ラスタライザーステート
 	graphicPipelineStateDesc.DepthStencilState = depthStencilDesc; //デプスステンシルステート
-	graphicPipelineStateDesc.DSVFormat=DXGI_FORMAT_D24_UNORM_S8_UINT; //DSVのフォーマット
+	graphicPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT; //DSVのフォーマット
 	//書き込むRTVの情報
 	graphicPipelineStateDesc.NumRenderTargets = 1; //RTVの数
 	graphicPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //RTVの形式
@@ -905,7 +937,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//バッファリソース
 	vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER; //バッファリソース
-	vertexResourceDesc.Width = sizeof(VertexData) * 16*16*6;//バッファのサイズ
+	vertexResourceDesc.Width = sizeof(VertexData) * 16 * 16 * 6;//バッファのサイズ
 
 	//バッファはすべて1
 	vertexResourceDesc.Height = 1;
@@ -1078,10 +1110,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//SRV用のデスクリプタヒープを生成
 	ID3D12DescriptorHeap* srvDescriptorHeap = CreateDescriptorHeap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
 
+	//DescriptorSizeを取得しておく
+	const uint32_t descriptorSizeSRV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	const uint32_t descriptorSizeRTV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+
 	//=================Textureを読んで転送=================
 	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
+
+	DirectX::ScratchImage mipImages2 = LoadTexture("resources/monsterBall.png");
+	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
+	ID3D12Resource* textureResource2 = CreateTextureResource(device, metadata2);
+	ID3D12Resource* intermediateResource2 = UploadTextureData(textureResource2, mipImages2, device, commandList);
+
 
 	//intermediateResourceをReleasする
 	ID3D12Resource* intermediateResource = UploadTextureData(textureResource, mipImages, device, commandList);
@@ -1116,6 +1159,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
 
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc2{};
+	srvDesc2.Format = metadata2.format;
+	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
+
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	//先頭はimguiなのでその次
@@ -1123,6 +1172,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+	device->CreateShaderResourceView(textureResource2, &srvDesc2, textureSrvHandleCPU2);
 
 	//=================ビューポート=========================
 	//ビューポート
@@ -1153,14 +1206,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress(); //リソースの先頭アドレス
 
 	//使用するリソースのサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 16*16*6;
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 16 * 16 * 6;
 
 	//1つの頂点のサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
 	//スプライト用のバッファービューを生成
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
-	
+
 	vertexBufferViewSprite.BufferLocation = vertexResourceSprite->GetGPUVirtualAddress();
 	vertexBufferViewSprite.SizeInBytes = sizeof(VertexData) * 6;
 	vertexBufferViewSprite.StrideInBytes = sizeof(VertexData);
@@ -1186,8 +1239,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
-		}
-		else {
+		} else {
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
@@ -1220,6 +1272,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			if (ImGui::ArrowButton("##right", ImGuiDir_Right)) {
 				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.x += moveAmount;
 			}
+			ImGui::Separator();
+			ImGui::Checkbox("useMonsterBall", &useMonsterBall); // モンスターボールの使用チェックボックス
 
 
 			//==================================================
@@ -1314,7 +1368,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			//SRVのDescriptorTableの先頭設定,2はRootParameter[2]
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall? textureSrvHandleGPU2 : textureSrvHandleGPU);
 
 
 
@@ -1322,6 +1376,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->DrawInstanced(1536, 1, 0, 0); // インスタンス数、頂点数、インデックス、オフセット
 
 			// スプライトの描画
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // スプライト用のテクスチャを設定
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite); // VBVを設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceSprite->GetGPUVirtualAddress()); // TransformationMatrixCBufferの場所を設定
 			commandList->DrawInstanced(6, 1, 0, 0); // 描画 (スプライト)
