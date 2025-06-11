@@ -32,18 +32,21 @@ PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
     float32_t4 textureColor = gTexture.Sample(gSampler, input.texcoord);
-    //output.color = float32_t4(1.0f, 1.0f, 1.0f, 1.0f);
-    output.color = gmaterial.color * textureColor;
-    
+
     if (gmaterial.enalbleLighting != 0)
     {
-        float cos = saturate(dot(input.normal, -gDirectionalLight.direction));
-        output.color = gmaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+        float NdotL = dot(input.normal, -gDirectionalLight.direction);
+
+        float halfLambertCos = NdotL * 0.5f + 0.5f; // Remap NdotL from [-1, 1] to [0, 1]
+        halfLambertCos *= halfLambertCos; // Square the result for a softer falloff
+
+        // Combine material color, texture color, light color, and the half-Lambert term
+        output.color = gmaterial.color * textureColor * gDirectionalLight.color * halfLambertCos * gDirectionalLight.intensity;
     }
     else
     {
         output.color = gmaterial.color * textureColor;
     }
-    
+
     return output;
 }
