@@ -71,6 +71,26 @@ struct VertexData
 {
 	Vector4 position;
 	Vector2 texcoord;
+	Vector3 normal;
+};
+
+struct Material
+{
+	Vector4 color;
+	int32_t enableLighting;
+};
+
+struct TransformationMatrix
+{
+	Matrix4x4 WVP;
+	Matrix4x4 World;
+};
+
+struct DirectionLight
+{
+	Vector4 color;
+	Vector3 direction;
+	float intensity;
 };
 
 //string<->wstring変換
@@ -484,6 +504,8 @@ float colorRGB[3] = { 1.0f,1.0f,1.0f };
 //テクスチャ切り替え
 bool useMonsterBall = true;
 
+bool isSpriteVisible = false;
+
 //Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -819,7 +841,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	//RootSignatureのパラメータの設定(rootParameter)
-	D3D12_ROOT_PARAMETER rootParameters[3] = {};
+	D3D12_ROOT_PARAMETER rootParameters[4] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // CBV
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // ピクセルシェーダーで使用
 	rootParameters[0].Descriptor.ShaderRegister = 0; // レジスタ番号
@@ -830,6 +852,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[3].Descriptor.ShaderRegister = 1; // レジスタ番号
 
 	descriptionRootSignature.pParameters = rootParameters;//ルートパラメーラ配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);//配列の長さ
@@ -854,7 +879,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	//InputLayout
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[2] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
 	inputElementDescs[0].SemanticName = "POSITION"; //セマンティクス名
 	inputElementDescs[0].SemanticIndex = 0; //セマンティクスのインデックス
 	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //データ形式
@@ -864,6 +889,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	inputElementDescs[1].SemanticIndex = 0; //セマンティクスのインデックス
 	inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT; //データ形式
 	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT; //オフセット
+
+	inputElementDescs[2].SemanticName = "NORMAL"; //セマンティクス名
+	inputElementDescs[2].SemanticIndex = 0; //セマンティクスのインデックス
+	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT; //データ形式
+	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT; //オフセット
+
+
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs; //セマンティクスの情報
 	inputLayoutDesc.NumElements = _countof(inputElementDescs); //セマンティクスの数
@@ -925,6 +957,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//実際に生成
 	ID3D12PipelineState* graphicPipelineState = nullptr;
+
 	hr = device->CreateGraphicsPipelineState(&graphicPipelineStateDesc, IID_PPV_ARGS(&graphicPipelineState));
 	//PSOの生成失敗
 	assert(SUCCEEDED(hr));
@@ -1038,6 +1071,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			vertexData[startIndex + 3].texcoord = { uv00.x, uv00.y };
 			vertexData[startIndex + 4].texcoord = { uv01.x, uv01.y };
 			vertexData[startIndex + 5].texcoord = { uv11.x, uv11.y };
+
+			for (int i = 0; i < 6; ++i) {
+				vertexData[startIndex + i].normal = Vector3{
+					vertexData[startIndex + i].position.x,
+					vertexData[startIndex + i].position.y,
+					vertexData[startIndex + i].position.z
+				};
+			}
 		}
 	}
 
@@ -1062,49 +1103,72 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	vertexDataSprite[0].position = { -0.0f, 360.0f, 0.0f, 1.0f };
 	vertexDataSprite[0].texcoord = { 0.0f,1.0f };
+	vertexDataSprite[0].normal = { 0.0f, 0.0f, -1.0f };
 	vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
 	vertexDataSprite[1].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[1].normal = { 0.0f, 0.0f, -1.0f };
 	vertexDataSprite[2].position = { 640.0f, 360.0f, 0.0f, 1.0f };
 	vertexDataSprite[2].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[2].normal = { 0.0f, 0.0f, -1.0f };
 	vertexDataSprite[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };
 	vertexDataSprite[3].texcoord = { 0.0f,0.0f };
+	vertexDataSprite[3].normal = { 0.0f, 0.0f, -1.0f };
 	vertexDataSprite[4].position = { 640.0f, 0.0f, 0.0f, 1.0f };
 	vertexDataSprite[4].texcoord = { 1.0f,0.0f };
+	vertexDataSprite[4].normal = { 0.0f, 0.0f, -1.0f };
 	vertexDataSprite[5].position = { 640.0f, 360.0f, 0.0f, 1.0f };
 	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
+	vertexDataSprite[5].normal = { 0.0f, 0.0f, -1.0f };
 
 	//================マテリアル=========================
 	//マテリアルリソースの初期化
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Material));
 
 	//マテリアルにデータを書き込む
-	Vector4* materialData = nullptr;
+	Material* materialData = nullptr;
 
 	//書き込むためのポインタを取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 
 	//色を書き込む
-	*materialData = Vector4(colorRGB[0], colorRGB[1], colorRGB[2], 1.0f);
+	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	materialData->enableLighting = false;
 
 	materialResource->Unmap(0, nullptr);
 
 	//==================transformMatrix用のResource=========================
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix));
 
 	//データを書き込む
-	Matrix4x4* wvpData = nullptr;
+	TransformationMatrix* wvpData = nullptr;
 
 	//書き込むためのポインタを取得
 	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 
 	//行列の初期化(単位行列を書き込む)
-	*wvpData = Identity4x4();
+	wvpData->WVP = Identity4x4();
+	wvpData->World = Identity4x4();
 
 
-	ID3D12Resource* wvpResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResourceSprite = CreateBufferResource(device, sizeof(TransformationMatrix));
 	Matrix4x4* wvpDataSprite = nullptr;
 	wvpResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&wvpDataSprite));
 	*wvpDataSprite = Identity4x4();
+
+	//================DirectionalLight用のResource=========================
+	ID3D12Resource* directionalLightResource = CreateBufferResource(device, sizeof(DirectionLight));
+
+	// データを書き込む
+	DirectionLight* directionalLightData = nullptr;
+	directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
+
+	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData->direction = { 0.0f, 1.0f, 0.0f };
+	directionalLightData->intensity = 1.0f;
+
+	directionalLightResource->Unmap(0, nullptr);
+
+
 
 	//=================SRV用のデスクリプター=========================
 	//SRV用のデスクリプタヒープを生成
@@ -1244,36 +1308,57 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
 
-			// ImGuiで色を変更するUIを追加
-			ImGui::Begin("Color Changer");
-			ImGui::ColorEdit3("Material Color", colorRGB); // 色変更用のUI
-			*materialData = Vector4(colorRGB[0], colorRGB[1], colorRGB[2], 1.0f);
-			ImGui::End();
+
 
 			// ユーザー入力可能な移動量（staticで保持）
 			static float moveAmount = 5.0f;
-			ImGui::InputFloat("Move Amount", &moveAmount, 1.0f, 10.0f, "%.1f");
+			ImGui::Checkbox("Show Sprite", &isSpriteVisible); // スプライト表示のチェックボックス
+			ImGui::Separator();
 
-			// 移動ボタン群
-			ImGui::Text("Move Sprite:");
+			// スプライトが表示されている時だけ移動ボタンを表示する
+			if (isSpriteVisible) {
+				// ユーザー入力可能な移動量（staticで保持）
+				static float moveAmount = 5.0f;
+				ImGui::InputFloat("Move Amount", &moveAmount, 1.0f, 10.0f, "%.1f");
 
-			if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
-				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.y -= moveAmount;
+				// 移動ボタン群
+				ImGui::Text("Move Sprite:");
+
+				if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+					for (int i = 0; i < 6; ++i)
+						vertexDataSprite[i].position.y -= moveAmount;
+				}
+				ImGui::SameLine();
+				if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+					for (int i = 0; i < 6; ++i)
+						vertexDataSprite[i].position.y += moveAmount;
+				}
+				ImGui::SameLine();
+				if (ImGui::ArrowButton("##left", ImGuiDir_Left)) {
+					for (int i = 0; i < 6; ++i)
+						vertexDataSprite[i].position.x -= moveAmount;
+				}
+				ImGui::SameLine();
+				if (ImGui::ArrowButton("##right", ImGuiDir_Right)) {
+					for (int i = 0; i < 6; ++i)
+						vertexDataSprite[i].position.x += moveAmount;
+				}
+				ImGui::Separator();
 			}
-			ImGui::SameLine();
-			if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
-				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.y += moveAmount;
-			}
-			ImGui::SameLine();
-			if (ImGui::ArrowButton("##left", ImGuiDir_Left)) {
-				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.x -= moveAmount;
-			}
-			ImGui::SameLine();
-			if (ImGui::ArrowButton("##right", ImGuiDir_Right)) {
-				for (int i = 0; i < 6; ++i) vertexDataSprite[i].position.x += moveAmount;
-			}
+
 			ImGui::Separator();
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall); // モンスターボールの使用チェックボックス
+			// ImGuiで色を変更するUIを追加
+			ImGui::Separator();
+			ImGui::Text("Material Properties");
+			ImGui::ColorEdit3("Color", &materialData->color.x); // 色変更用のUI
+			ImGui::Checkbox("Enable Lighting", (bool*)&materialData->enableLighting);
+			ImGui::Separator();
+			ImGui::Text("Light Properties");
+			// スライダーでライトの方向を変更
+			ImGui::SliderFloat3("Light Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
+			// 変更したベクトルを正規化して、長さを1に保つ
+			directionalLightData->direction = Normalize(directionalLightData->direction);
 
 
 			//==================================================
@@ -1303,7 +1388,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			Matrix4x4 projectionMatrix = MakePerspectiveMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
-			*wvpData = worldViewProjectionMatrix;
+
+			// 書き込み
+			wvpData->WVP = worldViewProjectionMatrix;
+			wvpData->World = worldMatrix;
 
 
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(
@@ -1367,8 +1455,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//wvp用のCBufferを設定
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+
 			//SRVのDescriptorTableの先頭設定,2はRootParameter[2]
-			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 
 
 
@@ -1376,11 +1466,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->DrawInstanced(1536, 1, 0, 0); // インスタンス数、頂点数、インデックス、オフセット
 
 			// スプライトの描画
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // スプライト用のテクスチャを設定
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite); // VBVを設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceSprite->GetGPUVirtualAddress()); // TransformationMatrixCBufferの場所を設定
-			commandList->DrawInstanced(6, 1, 0, 0); // 描画 (スプライト)
-
+			if (isSpriteVisible) {
+				// スプライトの描画
+				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU); // スプライト用のテクスチャを設定
+				commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);      // VBVを設定
+				commandList->SetGraphicsRootConstantBufferView(
+					1, wvpResourceSprite->GetGPUVirtualAddress()); // TransformationMatrixCBufferの場所を設定
+				commandList->DrawInstanced(6, 1, 0, 0);            // 描画 (スプライト)
+			}
 
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; //遷移前の状態
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT; //遷移後の状態
