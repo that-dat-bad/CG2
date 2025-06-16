@@ -11,7 +11,8 @@
 #include"Matrix4x4.h"
 #include<math.h>
 #define _USE_MATH_DEFINES
-
+#include<fstream>
+#include<sstream>
 
 
 //debug用のヘッダ
@@ -103,6 +104,19 @@ struct DirectionLight
 	Vector3 direction;
 	float intensity;
 };
+
+struct MaterialData
+{
+	std::string textureFilePath;
+};
+
+struct ModelData
+{
+	std::vector<VertexData> vertices;
+	MaterialData material;
+};
+
+
 
 //string<->wstring変換
 std::wstring ConvertString(const std::string& str) {
@@ -491,6 +505,97 @@ ID3D12Resource* UploadTextureData(ID3D12Resource* texture, const DirectX::Scratc
 
 	return intermediateResource;
 }
+
+MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename) {
+	//1.必要となる変数の宣言
+	MaterialData materialData;//構築するMaterialData
+	std::string line;//ファイルから読んだ1行を格納するもの
+	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
+	assert(file.is_open());//開けなかったら止める
+
+	//2.ファイルを読み、MaterialDataを構築
+	while (std::getline(file, line)) {
+		std::istringstream s(line); //行をストリームに変換
+		std::string identifier;//識別子
+		s >> identifier; //先頭の識別子を読み取る
+		if (identifier == "map_kd") {
+			std::string textureFileName;
+			s >> textureFileName; //テクスチャファイルパスを読み取る
+			materialData.textureFilePath = directoryPath + "/" + textureFileName; //ディレクトリパスと結合してフルパスを作成
+		}
+	}
+	return materialData;
+}
+
+ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename) {
+	//1.中で必要となる変数の宣言
+	ModelData modeldata;//構築するModeldata
+	std::vector<Vector4> positions;//位置
+	std::vector<Vector3> normals;//法線
+	std::vector<Vector2> texcoords;//テクスチャ座標
+	std::string line;//ファイルから読んだ1行を格納するもの
+
+	//2.ファイルを開く
+	std::ifstream file(directoryPath + "/" + filename);//ファイルを開く
+	assert(file.is_open());//開けなかったら止める
+
+	//3.ファイルを読み、ModelDataを構築
+	while (std::getline(file, line)) {
+		std::string identifier;//識別子
+		std::istringstream s(line); //行をストリームに変換
+		s >> identifier; //先頭の識別子を読み取る
+
+		if (identifier == "v")
+		{
+			Vector4 position;
+			s >> position.x >> position.y >> position.z;
+			position.w = 1.0f;
+			position.x *= -1; //OBJファイルは右手系なのでX軸を反転する
+			positions.push_back(position); //位置情報を追加
+		} else if (identifier == "vt")
+		{
+			Vector2 texcoord;
+			s >> texcoord.x >> texcoord.y;
+			texcoords.push_back(texcoord); //テクスチャ座標を追加
+		} else if (identifier == "vn")
+		{
+			Vector3 normal;
+			s >> normal.x >> normal.y >> normal.z;
+			normal.x *= -1; //OBJファイルは右手系なのでX軸を反転する
+			normals.push_back(normal); //法線を追加
+		} else if (identifier == "f")
+		{
+			for (int32_t faceVertex = 0; faceVertex < 3; faceVertex++)
+			{
+				std::string vertexDefinition;
+				s >> vertexDefinition; //頂点定義を読み取る
+				//頂点要素へのIndexは「位置/UV/法線」で格納されているので分解してIndexを取得する
+				std::istringstream v(vertexDefinition);
+				uint32_t elementIndices[3];
+
+				for (int32_t i = 0; i < 3; i++)
+				{
+					std::string index;
+					std::getline(v, index, '/'); // '/'で分割してIndexを取得
+					elementIndices[i] = std::stoi(index);
+				}
+				Vector4 position = positions[elementIndices[0] - 1]; //位置のIndexは1から始まるので-1する
+				Vector2 texcoord = texcoords[elementIndices[1] - 1]; //テクスチャ座標のIndexも同様
+				Vector3 normal = normals[elementIndices[2] - 1]; //法線のIndexも同様
+				VertexData vertex = { position, texcoord, normal }; //頂点データを構築
+				modeldata.vertices.push_back(vertex); //ModelDataに頂点データを追加
+			}
+		} else if (identifier=="mtllib")
+		{
+			std::string materialFileName;
+			s >> materialFileName;
+			//基本的にobjとmtlは同一階層に存在させるのでディレクトリ名とファイル名を渡す
+			modeldata.material = LoadMaterialTemplateFile(directoryPath, materialFileName);
+		}
+	}
+	return modeldata;
+}
+
 
 
 //========================================================================
@@ -1034,73 +1139,89 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
 
-	//球の頂点データを生成
-	const int kSubdivision = 16; // 分割数
-	const float radius = 1.0f;
-	for (int latIndex = 0; latIndex < kSubdivision; ++latIndex) {
-		float lat0 = float(latIndex) / kSubdivision * float(M_PI);
-		float lat1 = float(latIndex + 1) / kSubdivision * float(M_PI);
-		for (int lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
-			float lon0 = float(lonIndex) / kSubdivision * float(2.0 * M_PI);
-			float lon1 = float(lonIndex + 1) / kSubdivision * float(2.0 * M_PI);
+	////球の頂点データを生成
+	//const int kSubdivision = 16; // 分割数
+	//const float radius = 1.0f;
+	//for (int latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+	//	float lat0 = float(latIndex) / kSubdivision * float(M_PI);
+	//	float lat1 = float(latIndex + 1) / kSubdivision * float(M_PI);
+	//	for (int lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+	//		float lon0 = float(lonIndex) / kSubdivision * float(2.0 * M_PI);
+	//		float lon1 = float(lonIndex + 1) / kSubdivision * float(2.0 * M_PI);
 
-			// 頂点インデックスの計算
-			uint32_t startIndex = (latIndex * kSubdivision + lonIndex) * 6;
+	//		// 頂点インデックスの計算
+	//		uint32_t startIndex = (latIndex * kSubdivision + lonIndex) * 6;
 
-			// 球面上の4頂点
-			Vector3 p00 = {
-				radius * sinf(lat0) * cosf(lon0),
-				radius * cosf(lat0),
-				radius * sinf(lat0) * sinf(lon0)
-			};
-			Vector3 p10 = {
-				radius * sinf(lat1) * cosf(lon0),
-				radius * cosf(lat1),
-				radius * sinf(lat1) * sinf(lon0)
-			};
-			Vector3 p01 = {
-				radius * sinf(lat0) * cosf(lon1),
-				radius * cosf(lat0),
-				radius * sinf(lat0) * sinf(lon1)
-			};
-			Vector3 p11 = {
-				radius * sinf(lat1) * cosf(lon1),
-				radius * cosf(lat1),
-				radius * sinf(lat1) * sinf(lon1)
-			};
+	//		// 球面上の4頂点
+	//		Vector3 p00 = {
+	//			radius * sinf(lat0) * cosf(lon0),
+	//			radius * cosf(lat0),
+	//			radius * sinf(lat0) * sinf(lon0)
+	//		};
+	//		Vector3 p10 = {
+	//			radius * sinf(lat1) * cosf(lon0),
+	//			radius * cosf(lat1),
+	//			radius * sinf(lat1) * sinf(lon0)
+	//		};
+	//		Vector3 p01 = {
+	//			radius * sinf(lat0) * cosf(lon1),
+	//			radius * cosf(lat0),
+	//			radius * sinf(lat0) * sinf(lon1)
+	//		};
+	//		Vector3 p11 = {
+	//			radius * sinf(lat1) * cosf(lon1),
+	//			radius * cosf(lat1),
+	//			radius * sinf(lat1) * sinf(lon1)
+	//		};
 
-			// UV座標
-			Vector2 uv00 = { float(lonIndex) / kSubdivision, float(latIndex) / kSubdivision };
-			Vector2 uv10 = { float(lonIndex) / kSubdivision, float(latIndex + 1) / kSubdivision };
-			Vector2 uv01 = { float(lonIndex + 1) / kSubdivision, float(latIndex) / kSubdivision };
-			Vector2 uv11 = { float(lonIndex + 1) / kSubdivision, float(latIndex + 1) / kSubdivision };
+	//		// UV座標
+	//		Vector2 uv00 = { float(lonIndex) / kSubdivision, float(latIndex) / kSubdivision };
+	//		Vector2 uv10 = { float(lonIndex) / kSubdivision, float(latIndex + 1) / kSubdivision };
+	//		Vector2 uv01 = { float(lonIndex + 1) / kSubdivision, float(latIndex) / kSubdivision };
+	//		Vector2 uv11 = { float(lonIndex + 1) / kSubdivision, float(latIndex + 1) / kSubdivision };
 
-			// 三角形1（CCW: p00 → p11 → p10）
-			vertexData[startIndex + 0].position = { p00.x, p00.y, p00.z, 1.0f };
-			vertexData[startIndex + 1].position = { p11.x, p11.y, p11.z, 1.0f };
-			vertexData[startIndex + 2].position = { p10.x, p10.y, p10.z, 1.0f };
-			// 三角形2（CCW: p00 → p01 → p11）
-			vertexData[startIndex + 3].position = { p00.x, p00.y, p00.z, 1.0f };
-			vertexData[startIndex + 4].position = { p01.x, p01.y, p01.z, 1.0f };
-			vertexData[startIndex + 5].position = { p11.x, p11.y, p11.z, 1.0f };
-			// UV座標の設定
-			vertexData[startIndex + 0].texcoord = { uv00.x, uv00.y };
-			vertexData[startIndex + 1].texcoord = { uv11.x, uv11.y };
-			vertexData[startIndex + 2].texcoord = { uv10.x, uv10.y };
-			vertexData[startIndex + 3].texcoord = { uv00.x, uv00.y };
-			vertexData[startIndex + 4].texcoord = { uv01.x, uv01.y };
-			vertexData[startIndex + 5].texcoord = { uv11.x, uv11.y };
+	//		// 三角形1（CCW: p00 → p11 → p10）
+	//		vertexData[startIndex + 0].position = { p00.x, p00.y, p00.z, 1.0f };
+	//		vertexData[startIndex + 1].position = { p11.x, p11.y, p11.z, 1.0f };
+	//		vertexData[startIndex + 2].position = { p10.x, p10.y, p10.z, 1.0f };
+	//		// 三角形2（CCW: p00 → p01 → p11）
+	//		vertexData[startIndex + 3].position = { p00.x, p00.y, p00.z, 1.0f };
+	//		vertexData[startIndex + 4].position = { p01.x, p01.y, p01.z, 1.0f };
+	//		vertexData[startIndex + 5].position = { p11.x, p11.y, p11.z, 1.0f };
+	//		// UV座標の設定
+	//		vertexData[startIndex + 0].texcoord = { uv00.x, uv00.y };
+	//		vertexData[startIndex + 1].texcoord = { uv11.x, uv11.y };
+	//		vertexData[startIndex + 2].texcoord = { uv10.x, uv10.y };
+	//		vertexData[startIndex + 3].texcoord = { uv00.x, uv00.y };
+	//		vertexData[startIndex + 4].texcoord = { uv01.x, uv01.y };
+	//		vertexData[startIndex + 5].texcoord = { uv11.x, uv11.y };
 
-			for (int i = 0; i < 6; ++i) {
-				vertexData[startIndex + i].normal = Vector3{
-					vertexData[startIndex + i].position.x,
-					vertexData[startIndex + i].position.y,
-					vertexData[startIndex + i].position.z
-				};
-			}
-		}
-	}
+	//		for (int i = 0; i < 6; ++i) {
+	//			vertexData[startIndex + i].normal = Vector3{
+	//				vertexData[startIndex + i].position.x,
+	//				vertexData[startIndex + i].position.y,
+	//				vertexData[startIndex + i].position.z
+	//			};
+	//		}
+	//	}
+	//}
 
+	//モデル読み込み
+	ModelData modelData = LoadObjFile("resources", "plane.obj");
+
+	//頂点リソースを作る
+	ID3D12Resource* vertexResourceModel = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
+	//頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewModel{};
+	vertexBufferViewModel.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();
+	vertexBufferViewModel.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
+	vertexBufferViewModel.StrideInBytes = sizeof(VertexData);
+
+	//頂点リソースにデータを書き込む
+	VertexData* vertexDataModel = nullptr;
+	vertexResourceModel->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataModel));
+	//頂点データをコピー
+	std::memcpy(vertexDataModel, modelData.vertices.data(), sizeof(VertexData) * modelData.vertices.size());
 
 	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
 	vertexData[0].texcoord = { 0.0f,1.0f };
@@ -1211,7 +1332,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
 	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
 
-	DirectX::ScratchImage mipImages2 = LoadTexture("resources/monsterBall.png");
+	//DirectX::ScratchImage mipImages2 = LoadTexture("resources/monsterBall.png");
+	DirectX::ScratchImage mipImages2 = LoadTexture(modelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata2 = mipImages2.GetMetadata();
 	ID3D12Resource* textureResource2 = CreateTextureResource(device, metadata2);
 	ID3D12Resource* intermediateResource2 = UploadTextureData(textureResource2, mipImages2, device, commandList);
@@ -1294,13 +1416,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 	//リソースの先頭アドレスから使う
-	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress(); //リソースの先頭アドレス
-
-	//使用するリソースのサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 16 * 16 * 6;
-
-	//1つの頂点のサイズ
+	vertexBufferView.BufferLocation = vertexResourceModel->GetGPUVirtualAddress();
+	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
+
 
 	//スプライト用のバッファービューを生成
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferViewSprite{};
@@ -1407,6 +1526,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::SliderFloat3("Light Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
 			// 変更したベクトルを正規化して、長さを1に保つ
 			directionalLightData->direction = Normalize(directionalLightData->direction);
+			ImGui::Separator();
+			//モデルの回転
+			ImGui::Text("Model Rotation");
+			ImGui::SliderAngle("Rotate X", &transform.rotate.x);
+			ImGui::SliderAngle("Rotate Y", &transform.rotate.y);
+			ImGui::SliderAngle("Rotate Z", &transform.rotate.z);
 
 
 			//==================================================
@@ -1415,13 +1540,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-
-
-
-
-
-
-			transform.rotate.y += 0.03f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(
 				transform.scale,
 				transform.rotate,
@@ -1511,7 +1629,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 			// 3Dオブジェクトの描画
-			commandList->DrawInstanced(1536, 1, 0, 0); // インスタンス数、頂点数、インデックス、オフセット
+			//commandList->DrawInstanced(1536, 1, 0, 0); // インスタンス数、頂点数、インデックス、オフセット
+
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0); // モデルの頂点数を使用して描画
 
 			// スプライトの描画
 			if (isSpriteVisible) {
@@ -1519,7 +1639,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 					0, materialResourceSprite->GetGPUVirtualAddress());
 				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 				commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-				commandList->IASetIndexBuffer(&indexBufferViewSprite); 
+				commandList->IASetIndexBuffer(&indexBufferViewSprite);
 				commandList->SetGraphicsRootConstantBufferView(
 					1, wvpResourceSprite->GetGPUVirtualAddress());
 				commandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // インデックス描画
