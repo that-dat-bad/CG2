@@ -231,6 +231,33 @@ Matrix4x4 MakeScaleMatrix(const Vector3& scale)
 	return buf;
 }
 
+Matrix4x4 MakeRotateXMatrix(float angle) {
+	Matrix4x4 buf = Identity4x4();
+	buf.m[1][1] = cos(angle);
+	buf.m[1][2] = sin(angle);
+	buf.m[2][1] = -sin(angle);
+	buf.m[2][2] = cos(angle);
+	return buf;
+}
+
+Matrix4x4 MakeRotateYMatrix(float angle) {
+	Matrix4x4 buf = Identity4x4();
+	buf.m[0][0] = cos(angle);
+	buf.m[0][2] = -sin(angle);
+	buf.m[2][0] = sin(angle);
+	buf.m[2][2] = cos(angle);
+	return buf;
+}
+
+Matrix4x4 MakeRotateZMatrix(float angle) {
+	Matrix4x4 buf = Identity4x4();
+	buf.m[0][0] = cos(angle);
+	buf.m[0][1] = sin(angle);
+	buf.m[1][0] = -sin(angle);
+	buf.m[1][1] = cos(angle);
+	return buf;
+}
+
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate) {
 	//拡大縮小行列
 	Matrix4x4 scaleMatrix = Identity4x4();

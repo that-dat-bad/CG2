@@ -59,6 +59,15 @@ struct Vector2
 	float x, y;
 };
 
+struct Matrix3x3
+{
+	float m[3][3] = {
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f}
+	};
+};
+
 //Transformの定義
 struct Transform
 {
@@ -78,6 +87,8 @@ struct Material
 {
 	Vector4 color;
 	int32_t enableLighting;
+	float padding[3];
+	Matrix4x4 uvTransform;
 };
 
 struct TransformationMatrix
@@ -496,6 +507,7 @@ const int32_t kClientHeight = 720;
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-10.0f} };
 Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+Transform uvTransformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 //imgui用
 //色を保持
@@ -1132,8 +1144,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//色を書き込む
 	materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	materialData->enableLighting = false;
-
+	materialData->uvTransform = Identity4x4();
 	materialResource->Unmap(0, nullptr);
+
+
+	// ================ Sprite Material =========================
+	// スプライト用のマテリアルリソースの初期化
+	ID3D12Resource* materialResourceSprite = CreateBufferResource(device, sizeof(Material));
+
+	// スプライトのマテリアルにデータを書き込む
+	Material* materialDataSprite = nullptr;
+	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
+
+	// 色とライティングフラグを初期化
+	materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	materialDataSprite->enableLighting = false;
+	materialDataSprite->uvTransform = Identity4x4();
+	//UVTransform行列を単位行列で初期化
+	materialDataSprite->uvTransform = Identity4x4();
 
 	//==================transformMatrix用のResource=========================
 	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix));
@@ -1352,6 +1380,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 						vertexDataSprite[i].position.x += moveAmount;
 				}
 				ImGui::Separator();
+				ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+				ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, 0.1f, 10.0f);
+				ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+				// UV変換行列を作成
+				Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
+				uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
+				uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
+
+				// マテリアルに反映
+				materialDataSprite->uvTransform = uvTransformMatrix;
+
+				ImGui::Separator();
 			}
 
 			ImGui::Separator();
@@ -1475,6 +1515,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// スプライトの描画
 			if (isSpriteVisible) {
+				commandList->SetGraphicsRootConstantBufferView(
+					0, materialResourceSprite->GetGPUVirtualAddress());
 				commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 				commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
 				commandList->IASetIndexBuffer(&indexBufferViewSprite); 

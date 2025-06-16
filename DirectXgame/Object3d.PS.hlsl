@@ -4,8 +4,9 @@ struct Material
 {
     float32_t4 color;
     int32_t enalbleLighting;
+    float32_t4x4 uvTransform;
 };
-ConstantBuffer<Material> gmaterial : register(b0);
+ConstantBuffer<Material> gMaterial : register(b0);
 
 
 struct PixelShaderOutput
@@ -31,9 +32,10 @@ SamplerState gSampler : register(s0);
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    float32_t4 textureColor = gTexture.Sample(gSampler, input.texcoord);
-
-    if (gmaterial.enalbleLighting != 0)
+    float4 transformedUV = mul(float32_t4(input.texcoord,0.0f, 1.0f), gMaterial.uvTransform);
+    float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    
+    if (gMaterial.enalbleLighting != 0)
     {
         float NdotL = dot(input.normal, -gDirectionalLight.direction);
 
@@ -41,11 +43,11 @@ PixelShaderOutput main(VertexShaderOutput input)
         halfLambertCos *= halfLambertCos; // Square the result for a softer falloff
 
         // Combine material color, texture color, light color, and the half-Lambert term
-        output.color = gmaterial.color * textureColor * gDirectionalLight.color * halfLambertCos * gDirectionalLight.intensity;
+        output.color = gMaterial.color * textureColor * gDirectionalLight.color * halfLambertCos * gDirectionalLight.intensity;
     }
     else
     {
-        output.color = gmaterial.color * textureColor;
+        output.color = gMaterial.color * textureColor;
     }
 
     return output;
