@@ -556,6 +556,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		{
 			Vector2 texcoord;
 			s >> texcoord.x >> texcoord.y;
+			texcoord.y = 1.0f - texcoord.y; //OBJファイルはY軸が反転しているので反転する
 			texcoords.push_back(texcoord); //テクスチャ座標を追加
 		} else if (identifier == "vn")
 		{
@@ -565,10 +566,12 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			normals.push_back(normal); //法線を追加
 		} else if (identifier == "f")
 		{
+			// 面を構成する3頂点を一時的に格納するための配列
+			VertexData faceVertices[3];
 			for (int32_t faceVertex = 0; faceVertex < 3; faceVertex++)
 			{
 				std::string vertexDefinition;
-				s >> vertexDefinition; //頂点定義を読み取る
+				s >> vertexDefinition;
 				//頂点要素へのIndexは「位置/UV/法線」で格納されているので分解してIndexを取得する
 				std::istringstream v(vertexDefinition);
 				uint32_t elementIndices[3];
@@ -576,15 +579,21 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 				for (int32_t i = 0; i < 3; i++)
 				{
 					std::string index;
-					std::getline(v, index, '/'); // '/'で分割してIndexを取得
+					std::getline(v, index, '/');
 					elementIndices[i] = std::stoi(index);
 				}
-				Vector4 position = positions[elementIndices[0] - 1]; //位置のIndexは1から始まるので-1する
-				Vector2 texcoord = texcoords[elementIndices[1] - 1]; //テクスチャ座標のIndexも同様
-				Vector3 normal = normals[elementIndices[2] - 1]; //法線のIndexも同様
-				VertexData vertex = { position, texcoord, normal }; //頂点データを構築
-				modeldata.vertices.push_back(vertex); //ModelDataに頂点データを追加
+				Vector4 position = positions[elementIndices[0] - 1];
+				Vector2 texcoord = texcoords[elementIndices[1] - 1];
+				Vector3 normal = normals[elementIndices[2] - 1];
+
+				// すぐにモデルデータへ追加せず、一時配列に格納する
+				faceVertices[faceVertex] = { position, texcoord, normal };
 			}
+
+			// 2番目と3番目の頂点を入れ替えてモデルデータへ追加し、巻順を反転させる
+			modeldata.vertices.push_back(faceVertices[0]); // 1番目の頂点はそのまま
+			modeldata.vertices.push_back(faceVertices[2]); // 3番目の頂点を次に追加
+			modeldata.vertices.push_back(faceVertices[1]); // 2番目の頂点を最後に追加
 		} else if (identifier=="mtllib")
 		{
 			std::string materialFileName;
@@ -1207,7 +1216,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//}
 
 	//モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "plane.obj");
+	ModelData modelData = LoadObjFile("resources", "axis.obj");
+	modelData.material.textureFilePath = "resources/uvchecker.png";
 
 	//頂点リソースを作る
 	ID3D12Resource* vertexResourceModel = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
