@@ -39,11 +39,6 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include <xaudio2.h>
 #pragma comment(lib, "xaudio2.lib")
 
-#define DIRECTINPUT_VERSION 0x0800
-#include <dinput.h>
-#pragma comment(lib, "dinput8.lib")
-#pragma comment(lib, "dxguid.lib")
-
 //========================================================================
 //========================================================================
 //関数群
@@ -1590,33 +1585,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	SoundPlayWave(xAudio2.Get(), soundData1);
 
 
-	//===================DirectInputの初期化========================
-	IDirectInput8* directInput = nullptr;
-	HRESULT result = DirectInput8Create(
-		wc.hInstance,                  // ウィンドウクラスのインスタンスハンドル
-		DIRECTINPUT_VERSION,           // DirectInputのバージョン
-		IID_IDirectInput8,             // インターフェースID
-		(void**)&directInput,          // 取得したインターフェースの格納先
-		nullptr                        // 予約（通常nullptr）
-	);
-	assert(SUCCEEDED(result));
-
-	//キーボードデバイスの生成
-	IDirectInputDevice8* keyboard = nullptr;
-	result = directInput->CreateDevice(
-		GUID_SysKeyboard,              // キーボードのGUID
-		&keyboard,                     // 取得したデバイスの格納先
-		NULL                        // 予約（通常nullptr）
-	);
-	assert(SUCCEEDED(result));
-
-	//入力データ形式のフォーマット
-	result = keyboard->SetDataFormat(&c_dfDIKeyboard);
-	assert(SUCCEEDED(result));
-
-	result = keyboard->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE|DISCL_NOWINKEY);
-	assert(SUCCEEDED(result));
-
 	//===================message=========================
 	MSG msg{};
 	//windowのxが押されるまでループ
@@ -1626,12 +1594,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
-			// 毎フレームキーボード取得開始
-			keyboard->Acquire();
-			//全キーの入力状態を取得する
-			BYTE key[256] = {};
-			keyboard->GetDeviceState(sizeof(key), key);
-
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
@@ -1711,10 +1673,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//===================ゲームの処理===================
 			//==================================================
 
-			if (key[DIK_0])
-			{
-				OutputDebugStringA("Hit 0\n");
-			}
+
 
 			Matrix4x4 worldMatrix = MakeAffineMatrix(
 				transform.scale,
@@ -1900,7 +1859,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	debugController->Release();
 #endif // _DEBUG
 	vertexResource->Release();
-	graphicPipelineState->Release();
+	//graphicPipelineState->Release();
 	signatureBlob->Release();
 	if (errorBlob)
 	{
@@ -1913,17 +1872,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	xAudio2.Reset();
 	SoundUnload(&soundData1);
-
-	if (keyboard) {
-		keyboard->Unacquire(); // デバイスの解放
-		keyboard->Release();   // メモリ解放
-		keyboard = nullptr;
-	}
-	if (directInput) {
-		directInput->Release(); // メモリ解放
-		directInput = nullptr;
-	}
-
 
 	// COMの終了
 	CoUninitialize();
