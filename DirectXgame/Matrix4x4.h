@@ -58,3 +58,4 @@ Matrix4x4 makeOrthographicmMatrix(float left, float top, float right, float bott
 //ビューポート行列
 Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, float minDepth, float maxDepth);
 
+Vector3 TransformNormal(const Vector3& v, const Matrix4x4& m);

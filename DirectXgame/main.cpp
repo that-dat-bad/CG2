@@ -43,6 +43,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include <dinput.h>
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
+#include"DebugCamera.h"
 
 //========================================================================
 //========================================================================
@@ -63,10 +64,10 @@ struct Vector4
 	float x, y, z, w;
 };
 
-struct Vector2
-{
-	float x, y;
-};
+//struct Vector2
+//{
+//	float x, y;
+//};
 
 struct Matrix3x3
 {
@@ -726,9 +727,10 @@ const int32_t kClientHeight = 720;
 
 //transform
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-10.0f} };
+//Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-10.0f} };
 Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 Transform uvTransformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+DebugCamera g_debugCamera;
 
 //imgui用
 //色を保持
@@ -1610,6 +1612,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	);
 	assert(SUCCEEDED(result));
 
+	//マウスデバイスの生成
+	IDirectInputDevice8* mouse = nullptr;
+	result = directInput->CreateDevice(GUID_SysMouse, &mouse, NULL);
+	assert(SUCCEEDED(result));
+
+	//入力データ形式のフォーマット
+	result = mouse->SetDataFormat(&c_dfDIMouse2);
+	assert(SUCCEEDED(result));
+
+	//協調レベルの設定
+	result = mouse->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+	assert(SUCCEEDED(result));
+
 	//入力データ形式のフォーマット
 	result = keyboard->SetDataFormat(&c_dfDIKeyboard);
 	assert(SUCCEEDED(result));
@@ -1619,6 +1634,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//===================message=========================
 	MSG msg{};
+
+	bool enableCameraControl = true;
+
 	//windowのxが押されるまでループ
 	while (msg.message != WM_QUIT) {
 		//windowにメッセージが来てたら最優先で処理させる
@@ -1626,17 +1644,35 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
-			// 毎フレームキーボード取得開始
+			// 毎フレーム、キーボードとマウスの制御を取得しにいく
 			keyboard->Acquire();
-			//全キーの入力状態を取得する
+			mouse->Acquire();
+
+			// 全キーの入力状態を取得する
 			BYTE key[256] = {};
 			keyboard->GetDeviceState(sizeof(key), key);
 
+			// マウスの状態を取得する
+			DIMOUSESTATE2 mouseState = {};
+			HRESULT hr = mouse->GetDeviceState(sizeof(mouseState), &mouseState);
+
+			// マウス入力の取得に失敗した場合
+			assert(SUCCEEDED(hr));
+
+
+
+			if (mouseState.lX != 0 || mouseState.lY != 0) {
+				std::string debug_str = std::format("Nyan! Mouse Move X: {}, Y: {}\n", mouseState.lX, mouseState.lY);
+				OutputDebugStringA(debug_str.c_str());
+			}
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
 
-
+			ImGui::Begin("Camera Settings");
+			// チェックボックスを描画し、enableCameraControl変数と連動させる
+			ImGui::Checkbox("Enable Camera Control", &enableCameraControl);
+			ImGui::End();
 
 			// ユーザー入力可能な移動量（staticで保持）
 			static float moveAmount = 5.0f;
@@ -1710,6 +1746,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//==================================================
 			//===================ゲームの処理===================
 			//==================================================
+			 // DebugCameraを更新
+			if (enableCameraControl && !ImGui::GetIO().WantCaptureMouse) {
+				g_debugCamera.Update(key, mouseState);
+			}
+
 
 			if (key[DIK_0])
 			{
@@ -1721,12 +1762,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				transform.rotate,
 				transform.translate
 			);
-			Matrix4x4 cameraMatrix = MakeAffineMatrix(
+			/*Matrix4x4 cameraMatrix = MakeAffineMatrix(
 				cameraTransform.scale,
 				cameraTransform.rotate,
 				cameraTransform.translate
 			);
-			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
+			Matrix4x4 viewMatrix = Inverse(cameraMatrix);*/
+			const Matrix4x4& viewMatrix = g_debugCamera.GetViewMatrix();
 			Matrix4x4 projectionMatrix = MakePerspectiveMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 			Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
@@ -1918,6 +1960,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		keyboard->Unacquire(); // デバイスの解放
 		keyboard->Release();   // メモリ解放
 		keyboard = nullptr;
+	}
+	if (mouse) {
+		mouse->Unacquire();
+		mouse->Release();
+		mouse = nullptr;
 	}
 	if (directInput) {
 		directInput->Release(); // メモリ解放
