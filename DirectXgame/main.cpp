@@ -1900,7 +1900,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	debugController->Release();
 #endif // _DEBUG
 	vertexResource->Release();
-	graphicPipelineState->Release();
+	//graphicPipelineState->Release();
 	signatureBlob->Release();
 	if (errorBlob)
 	{
