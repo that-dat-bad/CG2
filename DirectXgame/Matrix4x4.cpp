@@ -69,10 +69,10 @@ Matrix4x4 Multiply(const Matrix4x4& m1, const Matrix4x4& m2)
 	buf.m[2][2] = m1.m[2][0] * m2.m[0][2] + m1.m[2][1] * m2.m[1][2] + m1.m[2][2] * m2.m[2][2] + m1.m[2][3] * m2.m[3][2];
 	buf.m[2][3] = m1.m[2][0] * m2.m[0][3] + m1.m[2][1] * m2.m[1][3] + m1.m[2][2] * m2.m[2][3] + m1.m[2][3] * m2.m[3][3];
 
-	buf.m[3][0] = m1.m[1][0] * m2.m[0][0] + m1.m[3][1] * m2.m[1][0] + m1.m[3][2] * m2.m[2][0] + m1.m[3][3] * m2.m[3][0];
-	buf.m[3][1] = m1.m[1][0] * m2.m[0][1] + m1.m[3][1] * m2.m[1][1] + m1.m[3][2] * m2.m[2][1] + m1.m[3][3] * m2.m[3][1];
-	buf.m[3][2] = m1.m[1][0] * m2.m[0][2] + m1.m[3][1] * m2.m[1][2] + m1.m[3][2] * m2.m[2][2] + m1.m[3][3] * m2.m[3][2];
-	buf.m[3][3] = m1.m[1][0] * m2.m[0][3] + m1.m[3][1] * m2.m[1][3] + m1.m[3][2] * m2.m[2][3] + m1.m[3][3] * m2.m[3][3];
+	buf.m[3][0] = m1.m[3][0] * m2.m[0][0] + m1.m[3][1] * m2.m[1][0] + m1.m[3][2] * m2.m[2][0] + m1.m[3][3] * m2.m[3][0];
+	buf.m[3][1] = m1.m[3][0] * m2.m[0][1] + m1.m[3][1] * m2.m[1][1] + m1.m[3][2] * m2.m[2][1] + m1.m[3][3] * m2.m[3][1];
+	buf.m[3][2] = m1.m[3][0] * m2.m[0][2] + m1.m[3][1] * m2.m[1][2] + m1.m[3][2] * m2.m[2][2] + m1.m[3][3] * m2.m[3][2];
+	buf.m[3][3] = m1.m[3][0] * m2.m[0][3] + m1.m[3][1] * m2.m[1][3] + m1.m[3][2] * m2.m[2][3] + m1.m[3][3] * m2.m[3][3];
 
 	return buf;
 
@@ -231,6 +231,33 @@ Matrix4x4 MakeScaleMatrix(const Vector3& scale)
 	return buf;
 }
 
+Matrix4x4 MakeRotateXMatrix(float angle) {
+	Matrix4x4 buf = Identity4x4();
+	buf.m[1][1] = cos(angle);
+	buf.m[1][2] = sin(angle);
+	buf.m[2][1] = -sin(angle);
+	buf.m[2][2] = cos(angle);
+	return buf;
+}
+
+Matrix4x4 MakeRotateYMatrix(float angle) {
+	Matrix4x4 buf = Identity4x4();
+	buf.m[0][0] = cos(angle);
+	buf.m[0][2] = -sin(angle);
+	buf.m[2][0] = sin(angle);
+	buf.m[2][2] = cos(angle);
+	return buf;
+}
+
+Matrix4x4 MakeRotateZMatrix(float angle) {
+	Matrix4x4 buf = Identity4x4();
+	buf.m[0][0] = cos(angle);
+	buf.m[0][1] = sin(angle);
+	buf.m[1][0] = -sin(angle);
+	buf.m[1][1] = cos(angle);
+	return buf;
+}
+
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate) {
 	//拡大縮小行列
 	Matrix4x4 scaleMatrix = Identity4x4();
@@ -335,4 +362,13 @@ Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, f
 	buf.m[3][1] = top + (height / 2);
 	buf.m[3][2] = minDepth;
 	return buf;
+}
+
+Vector3 TransformNormal(const Vector3& v, const Matrix4x4& m) {
+	Vector3 result{
+		v.x * m.m[0][0] + v.y * m.m[1][0] + v.z * m.m[2][0],
+		v.x * m.m[0][1] + v.y * m.m[1][1] + v.z * m.m[2][1],
+		v.x * m.m[0][2] + v.y * m.m[1][2] + v.z * m.m[2][2]
+	};
+	return result;
 }
