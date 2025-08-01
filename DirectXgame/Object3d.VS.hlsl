@@ -1,29 +1,47 @@
-#include "Object3d.hlsli"
+// Object3D.VS.hlsl
+// 頂点シェーダー
 
+// 頂点データの入力構造体
+struct VertexInput
+{
+    float4 position : POSITION0;
+    float2 texcoord : TEXCOORD0;
+    float3 normal : NORMAL0;
+};
+
+// ピクセルシェーダーへの出力構造体
+struct VertexOutput
+{
+    float4 position : SV_POSITION;
+    float2 texcoord : TEXCOORD0;
+    float3 normal : NORMAL0;
+    float3 worldPosition : WORLDPOSITION0;
+};
+
+// 変換行列を格納する定数バッファ
 struct TransformationMatrix
 {
-    float32_t4x4 WVP;
-    float32_t4x4 World;
+    matrix WVP; // World * View * Projection
+    matrix World; // World
 };
+
 ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b1);
 
-
-struct VertexShaderInput
+VertexOutput main(VertexInput input)
 {
-    float32_t4 position : POSITION0;
-    float32_t2 texcoord : TEXCOORD0;
-    float32_t3 normal : NORMAL0;
-};
-
-
-
-VertexShaderOutput main(VertexShaderInput input)
-{
-    VertexShaderOutput output;
-    //output.position = input.position;
-    output.position = mul(input.position, gTransformationMatrix.WVP); //mulは行列の積
+    VertexOutput output;
+    
+    // 座標変換
+    output.position = mul(input.position, gTransformationMatrix.WVP);
+    
+    // UV座標をそのまま渡す
     output.texcoord = input.texcoord;
-    output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrix.World));
+    
+    // 法線をワールド空間に変換して正規化
+    output.normal = normalize(mul(input.normal, (float3x3) gTransformationMatrix.World));
+    
+    // 頂点位置をワールド空間に変換
+    output.worldPosition = mul(input.position, gTransformationMatrix.World).xyz;
+    
     return output;
 }
-
