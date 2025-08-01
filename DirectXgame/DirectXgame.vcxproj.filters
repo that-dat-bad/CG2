@@ -57,6 +57,7 @@
       <Filter>リソース ファイル</Filter>
     </None>
     <None Include="Object3d.hlsli" />
+    <None Include="ReadMe.md" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.VS.hlsl" />
