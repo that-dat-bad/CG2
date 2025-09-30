@@ -59,11 +59,21 @@ PixelShaderOutput main(PixelInput input)
         texColor = gTexture.Sample(gSampler, transformedUV);
     }
 
+    if (texColor.a < 0.1f)
+    {
+        discard;
+    }
+    
     // マテリアルの色を乗算
     //output.color = texColor * gMaterial.color;
 
     output.color.rgb = texColor.rgb * gMaterial.color.rgb;
     output.color.a = texColor.a * gMaterial.color.a;
+    
+    if(output.color.a < 0.1f)
+    {
+        discard;
+    }
     
     // ライティングが有効な場合
     if (gMaterial.enableLighting != 0)

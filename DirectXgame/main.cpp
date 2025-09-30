@@ -653,8 +653,8 @@ void SetBlendDesc(D3D12_BLEND_DESC& desc, kBlendMode mode) {
 	desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	desc.RenderTarget[0].BlendEnable = (mode != kBlendModeNone);
 	desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
-		desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	switch (mode) {
 	case kBlendModeNone: // 不透明
 		desc.RenderTarget[0].BlendEnable = FALSE;
@@ -967,6 +967,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		"resources/uvchecker.png",
 		"resources/monsterBall.png",
 		"resources/checkerBoard.png",
+		"resources/fence.png",
 	};
 
 	// ImGui用に1つ予約
@@ -1011,7 +1012,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		"bunny.obj",
 		"suzanne.obj",
 		"multiMesh.obj",
-		"multiMaterial.obj"
+		"multiMaterial.obj",
+		"fence.obj"
 	};
 	for (const auto& filename : modelPaths) {
 		ModelData modelData = LoadObjFile("resources", filename, device.Get());
@@ -1029,7 +1031,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	GameObject obj2;
 	obj2.transform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {2.0f, 0.0f, 0.0f} }; // 2つ目のオブジェクトをX軸にオフセット
-	obj2.modelAssetIndex = 2; // Teapot
+	obj2.modelAssetIndex = 7; // Teapot
 	gameObjects.push_back(obj2);
 
 	// ImGuiで選択されているメッシュのインデックス
@@ -1249,7 +1251,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
 
 				// enableLightingが有効な場合のみ、ライトの方向を調整可能にする
-				// ここでは、最初のオブジェクトのライティング設定を代表として使用
 				if (!gameObjects.empty() && gameObjects[0].modelAssetIndex >= 0 && gameObjects[0].modelAssetIndex < modelAssets.size() &&
 					!modelAssets[gameObjects[0].modelAssetIndex].modelData.meshes.empty() &&
 					modelAssets[gameObjects[0].modelAssetIndex].modelData.meshes[0].materialData->enableLighting != 0) {
@@ -1326,7 +1327,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 					ImGui::PopID(); // ユニークなIDをポップ
 				}
 			}
-			ImGui::End(); // Global Settings End
+			ImGui::End();
 
 			// multimesh.objが選択されている場合のみMesh Settingsを表示
 			// このセクションは、最初のゲームオブジェクトがmultiMesh.objの場合にのみ表示されます。
