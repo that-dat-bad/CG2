@@ -60,8 +60,11 @@ PixelShaderOutput main(PixelInput input)
     }
 
     // マテリアルの色を乗算
-    output.color = texColor * gMaterial.color;
+    //output.color = texColor * gMaterial.color;
 
+    output.color.rgb = texColor.rgb * gMaterial.color.rgb;
+    output.color.a = texColor.a * gMaterial.color.a;
+    
     // ライティングが有効な場合
     if (gMaterial.enableLighting != 0)
     {
