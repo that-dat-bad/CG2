@@ -161,6 +161,20 @@ struct SoundData {
 	unsigned int buffersize;
 };
 
+enum kBlendMode
+{
+	kBlendModeNone,
+	kBlendModeNormal,
+	kBlendModeAdd,
+	kBlendModeSubstract,
+	kBlendModeMultiply,
+	kBlendModeScreen,
+
+	kBlendModeCount
+
+};
+kBlendMode blendMode = kBlendModeNone;
+
 
 //ログ用関数
 void Log(const std::string& message) {
@@ -634,6 +648,50 @@ void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData) {
 	result = pSourceVoice->Start(0);
 }
 
+void SetBlendDesc(D3D12_BLEND_DESC& desc, kBlendMode mode) {
+	desc = {};
+	desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	desc.RenderTarget[0].BlendEnable = (mode != kBlendModeNone);
+	desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	switch (mode) {
+	case kBlendModeNone: // 不透明
+		desc.RenderTarget[0].BlendEnable = FALSE;
+		break;
+	case kBlendModeNormal: // 通常α
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+
+		break;
+	case kBlendModeAdd: // 加算
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+
+		break;
+	case kBlendModeSubstract: // 減算
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_SUBTRACT;
+
+		break;
+	case kBlendModeMultiply: // 乗算
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+
+		break;
+	case kBlendModeScreen: // スクリーン
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+
+		break;
+	}
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -866,9 +924,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
@@ -1149,7 +1209,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			{
 				// グローバル設定
 				ImGui::SeparatorText("Global Settings");
-				// ライティングモデルの選択肢に「None」を追加
+				// BlendMode選択
+				const char* blendModeItems[] = {
+					"None", "Normal", "Add", "Substract", "Multiply", "Screen"
+				};
+				if (ImGui::Combo("Blend Mode", (int*)&blendMode, blendModeItems, kBlendModeCount)) {
+					SetBlendDesc(blendDesc, blendMode);
+					graphicsPipelineStateDesc.BlendState = blendDesc;
+					device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
+				}
+
+				// ライティングモデルの選択
 				const char* lightingItems[] = { "Lambert", "Half-Lambert", "None" };
 				ImGui::Combo("Lighting Model", &selectedLightingOption, lightingItems, IM_ARRAYSIZE(lightingItems));
 
