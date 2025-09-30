@@ -640,25 +640,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 	SetUnhandledExceptionFilter(ExportDump);
 
-	WNDCLASS wc{};
-	wc.lpfnWndProc = WindowProc;
-	wc.lpszClassName = L"CG2WindowClass";
-	wc.hInstance = GetModuleHandle(nullptr);
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	RegisterClass(&wc);
-
-	const int32_t kClientWidth = 1280;
-	const int32_t kClientHeight = 720;
-
-	RECT wrc = { 0, 0, kClientWidth, kClientHeight };
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
-
-	HWND hwnd = CreateWindow(
-		wc.lpszClassName, L"CG2", WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, wrc.right - wrc.left, wrc.bottom - wrc.top,
-		nullptr, nullptr, wc.hInstance, nullptr);
-
-	ShowWindow(hwnd, SW_SHOW);
+	static const int32_t kClientWidth = 1280;
+	static const int32_t kClientHeight = 720;
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
