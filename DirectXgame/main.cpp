@@ -47,7 +47,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include <Xinput.h> // XInputのヘッダを追加
 #pragma comment(lib, "xinput.lib") // XInputのライブラリをリンク
 
-
+#pragma region 構造体
 struct Vector4 { float x, y, z, w; };
 
 
@@ -160,6 +160,7 @@ struct SoundData {
 	BYTE* pBuffer;
 	unsigned int buffersize;
 };
+#pragma endregion
 
 enum kBlendMode
 {
@@ -175,7 +176,9 @@ enum kBlendMode
 };
 kBlendMode blendMode = kBlendModeNone;
 
+int instanceCount =10; // インスタンス数
 
+#pragma region 関数群
 //ログ用関数
 void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
@@ -692,6 +695,8 @@ void SetBlendDesc(D3D12_BLEND_DESC& desc, kBlendMode mode) {
 	}
 }
 
+#pragma endregion
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
@@ -863,23 +868,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+	descriptorRangeForInstancing[0].BaseShaderRegister = 0;
+	descriptorRangeForInstancing[0].NumDescriptors = 1;
+	descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 	D3D12_ROOT_PARAMETER rootParameters[5] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[0].Descriptor.ShaderRegister = 0; // for Material
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[1].Descriptor.ShaderRegister = 1; // for WVP
+	rootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+	rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[3].Descriptor.ShaderRegister = 1; // for DirectionalLight
+	rootParameters[3].Descriptor.ShaderRegister = 1;
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[4].Descriptor.ShaderRegister = 2; // for LightingSettings
+	rootParameters[4].Descriptor.ShaderRegister = 2;
 
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
 	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -1485,7 +1497,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 							// UVがないかテクスチャが指定されていない場合はデフォルトのテクスチャ (uvchecker.png) を使用
 							commandList->SetGraphicsRootDescriptorTable(2, textureAssets[0].gpuHandle);
 						}
-						commandList->DrawInstanced(UINT(mesh.vertices.size()), 1, 0, 0);
+						commandList->DrawInstanced(UINT(mesh.vertices.size()), 1, instanceCount, 0);
 					}
 				}
 			}
