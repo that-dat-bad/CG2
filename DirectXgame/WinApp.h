@@ -2,37 +2,31 @@
 #include <Windows.h>
 #include <cstdint>
 
-#include "./externals/imgui/imgui.h"
-#include "./externals/imgui/imgui_impl_dx12.h"
-#include "./externals/imgui/imgui_impl_win32.h"
 
 class WinApp {
 public:
-    static const int32_t kClientWidth = 1280;
-    static const int32_t kClientHeight = 720;
+	// クライアント領域のサイズ
+	static const int32_t kClientWidth = 1280;
+	static const int32_t kClientHeight = 720;
 
-    // シングルトンインスタンスの取得
-    static WinApp* GetInstance();
-
-    // 初期化
-    void Initialize();
-
-    // 更新
-    bool Update();
+public:
+	// 初期化
+	void Initialize();
 
 
-    // HWNDの取得
-    HWND GetHwnd() const { return hwnd_; }
-    HINSTANCE GetHinstance() const { return wc_.hInstance; }
+	bool ProcessMessage();
 
-private:
-    WinApp(const WinApp&) = delete;
-    const WinApp& operator=(const WinApp&) = delete;
+	// 終了
+	void Finalize();
 
-    // ウィンドウプロシージャ
-    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+	// ウィンドウハンドルの取得
+	HWND GetHwnd() const { return hwnd_; }
 
 private:
-    HWND hwnd_ = nullptr;
-    WNDCLASS wc_{};
+	// ウィンドウプロシージャ
+	static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
+private:
+	HWND hwnd_ = nullptr;
+	WNDCLASS wc_{};
 };
