@@ -16,6 +16,7 @@
 #include<sstream>
 #include <map>
 #include"DebugCamera.h"
+#include "winApp.h"
 
 // debug用のヘッダ
 #include <DbgHelp.h>
@@ -33,7 +34,6 @@
 #include "./externals/imgui/imgui.h"
 #include "./externals/imgui/imgui_impl_dx12.h"
 #include "./externals/imgui/imgui_impl_win32.h"
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 #include "./externals/DirectXTex/DirectXTex.h"
 #include "./externals/DirectXTex/d3dx12.h"
@@ -161,7 +161,7 @@ struct SoundData {
 	unsigned int buffersize;
 };
 
-
+#pragma region 関数群
 //ログ用関数
 void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
@@ -300,17 +300,6 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam)) {
-		return true;
-	}
-	switch (msg) {
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
-	}
-	return DefWindowProc(hwnd, msg, wParam, lParam);
-}
 
 Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(const std::wstring& filePath, const wchar_t* profile, IDxcUtils* dxcUtils, IDxcCompiler3* dxcCompiler, IDxcIncludeHandler* includeHandler) {
 	Log(ConvertString(std::format(L"Begin CompileShader, Path :{}, profile : {}\n", filePath, profile)));
@@ -425,7 +414,8 @@ std::map<std::string, MaterialData> LoadMaterialTemplates(const std::string& dir
 		if (identifier == "newmtl") {
 			s >> currentMaterialName;
 			materials[currentMaterialName].name = currentMaterialName;
-		} else if (identifier == "map_Kd" && !currentMaterialName.empty()) {
+		}
+		else if (identifier == "map_Kd" && !currentMaterialName.empty()) {
 			std::string textureFileName;
 			s >> textureFileName;
 			materials[currentMaterialName].textureFilePath = directoryPath + "/" + textureFileName;
@@ -491,27 +481,31 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			currentMesh.transform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} }; // デフォルト変換
 			currentMesh.uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} }; // UV変換の初期化
 			currentMesh.hasUV = false; // 初期化
-		} else if (identifier == "v") {
+		}
+		else if (identifier == "v") {
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
 			position.w = 1.0f;
 			// 座標系の変換
 			position.x *= -1.0f;
 			positions.push_back(position);
-		} else if (identifier == "vt") {
+		}
+		else if (identifier == "vt") {
 			Vector2 texcoord;
 			s >> texcoord.x >> texcoord.y;
 			// V方向の反転
 			texcoord.y = 1.0f - texcoord.y;
 			texcoords.push_back(texcoord);
 			currentMesh.hasUV = true; // このメッシュはUVを持つ
-		} else if (identifier == "vn") {
+		}
+		else if (identifier == "vn") {
 			Vector3 normal;
 			s >> normal.x >> normal.y >> normal.z;
 			// 座標系の変換
 			normal.x *= -1.0f;
 			normals.push_back(normal);
-		} else if (identifier == "f") {
+		}
+		else if (identifier == "f") {
 			VertexData faceVertices[3];
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex) {
 				std::string vertexDefinition;
@@ -545,11 +539,13 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			currentMesh.vertices.push_back(faceVertices[0]);
 			currentMesh.vertices.push_back(faceVertices[2]);
 			currentMesh.vertices.push_back(faceVertices[1]);
-		} else if (identifier == "mtllib") {
+		}
+		else if (identifier == "mtllib") {
 			std::string materialFileName;
 			s >> materialFileName;
 			loadedMaterials = LoadMaterialTemplates(directoryPath, materialFileName);
-		} else if (identifier == "usemtl") {
+		}
+		else if (identifier == "usemtl") {
 			std::string materialName;
 			s >> materialName;
 			if (loadedMaterials.count(materialName)) {
@@ -634,14 +630,16 @@ void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData) {
 	result = pSourceVoice->Start(0);
 }
 
-// Windowsアプリでのエントリーポイント(main関数)
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+#pragma endregion
 
-	CoInitializeEx(0, COINIT_MULTITHREADED);
+// Windowsアプリでのエントリーポイント(main関数)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
+
+	WinApp* winApp = new WinApp();
+	// ウィンドウの初期化
+	winApp->Initialize();
 	SetUnhandledExceptionFilter(ExportDump);
 
-	static const int32_t kClientWidth = 1280;
-	static const int32_t kClientHeight = 720;
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
@@ -722,8 +720,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// スワップチェーンの生成
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain = nullptr;
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-	swapChainDesc.Width = kClientWidth;
-	swapChainDesc.Height = kClientHeight;
+	swapChainDesc.Width = winApp->kClientWidth;
+	swapChainDesc.Height = winApp->kClientHeight;
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	swapChainDesc.SampleDesc.Count = 1;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -731,7 +729,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain1> tempSwapChain;
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, &tempSwapChain);
+	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), winApp->GetHwnd(), &swapChainDesc, nullptr, nullptr, &tempSwapChain);
 	assert(SUCCEEDED(hr));
 	hr = tempSwapChain.As(&swapChain);
 	assert(SUCCEEDED(hr));
@@ -752,7 +750,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	}
 
 	// DSVディスクリプタヒープとリソースの生成
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTextureResource(device.Get(), kClientWidth, kClientHeight);
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource = CreateDepthStencilTextureResource(device.Get(), winApp->kClientWidth, winApp->kClientHeight);
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap = CreateDescriptorHeap(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
 	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -907,7 +905,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// ここを修正: テクスチャがsRGBの場合、SRVのフォーマットを_SRGBにする
 		if (metadata.format == DXGI_FORMAT_R8G8B8A8_UNORM) { // 一般的なPNGのフォーマット
 			srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-		} else {
+		}
+		else {
 			srvDesc.Format = metadata.format;
 		}
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -930,11 +929,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	std::vector<std::string> modelPaths = {
 		"sphere.obj",
 		"plane.obj",
-		"teapot.obj",
-		"bunny.obj",
-		"suzanne.obj",
-		"multiMesh.obj",
-		"multiMaterial.obj"
+		//"teapot.obj",
+		//"bunny.obj",
+		//"suzanne.obj",
+		//"multiMesh.obj",
+		//"multiMaterial.obj"
 	};
 	for (const auto& filename : modelPaths) {
 		ModelData modelData = LoadObjFile("resources", filename, device.Get());
@@ -1035,18 +1034,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// ビューポートとシザー矩形
 	D3D12_VIEWPORT viewport{};
-	viewport.Width = kClientWidth; viewport.Height = kClientHeight;
+	viewport.Width = winApp->kClientWidth; viewport.Height = winApp->kClientHeight;
 	viewport.TopLeftX = 0; viewport.TopLeftY = 0;
 	viewport.MinDepth = 0.0f; viewport.MaxDepth = 1.0f;
 	D3D12_RECT scissorRect{};
-	scissorRect.left = 0; scissorRect.right = kClientWidth;
-	scissorRect.top = 0; scissorRect.bottom = kClientHeight;
+	scissorRect.left = 0; scissorRect.right = winApp->kClientWidth;
+	scissorRect.top = 0; scissorRect.bottom = winApp->kClientHeight;
 
 	// ImGuiの初期化
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplWin32_Init(winApp->GetHwnd());
 	ImGui_ImplDX12_Init(device.Get(), swapChainDesc.BufferCount,
 		rtvDesc.Format, srvDescriptorHeap.Get(),
 		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
@@ -1054,17 +1053,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// 入力とカメラ
 	Microsoft::WRL::ComPtr<IDirectInput8> directInput = nullptr;
-	DirectInput8Create(wc.hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
+	DirectInput8Create(hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
 
 	Microsoft::WRL::ComPtr<IDirectInputDevice8> keyboard = nullptr;
 	directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
 	keyboard->SetDataFormat(&c_dfDIKeyboard);
-	keyboard->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+	keyboard->SetCooperativeLevel(winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
 
 	Microsoft::WRL::ComPtr<IDirectInputDevice8> mouse = nullptr;
 	directInput->CreateDevice(GUID_SysMouse, &mouse, NULL);
 	mouse->SetDataFormat(&c_dfDIMouse2);
-	mouse->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+	mouse->SetCooperativeLevel(winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
 
 	DebugCamera g_debugCamera;
 
@@ -1081,365 +1080,370 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	SoundData alarmSound = SoundLoadWave("resources/Alarm01.wav");
 
 
-	// メインループ
-	MSG msg{};
 	// ImGuiのコンボボックスの状態を保持する変数
 	int selectedLightingOption = 0; // 0: Lambert, 1: Half-Lambert, 2: None
 
-	while (msg.message != WM_QUIT) {
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		} else {
-			// ImGuiフレーム開始
-			ImGui_ImplDX12_NewFrame();
-			ImGui_ImplWin32_NewFrame();
-			ImGui::NewFrame();
+	while (true) {
 
-			// 入力取得
-			keyboard->Acquire();
-			mouse->Acquire();
-			BYTE keys[256] = {};
-			keyboard->GetDeviceState(sizeof(keys), keys);
-			DIMOUSESTATE2 mouseState = {};
-			mouse->GetDeviceState(sizeof(mouseState), &mouseState);
-
-			// Gamepad input
-			XINPUT_STATE gamepadState;
-			ZeroMemory(&gamepadState, sizeof(XINPUT_STATE));
-			DWORD dwResult = XInputGetState(0, &gamepadState); // Get the state of player 1's gamepad
-
-			// カメラ更新
-			g_debugCamera.Update(keys, mouseState);
-
-			// Gamepadで最初のモデルの回転を操作
-			if (dwResult == ERROR_SUCCESS && !gameObjects.empty()) // Gamepad is connected and at least one object exists
-			{
-				float rotationSpeed = 0.05f; // 回転速度
-
-				// 右スティックのX軸でY軸回転
-				if (abs(gamepadState.Gamepad.sThumbRX) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) {
-					gameObjects[0].transform.rotate.y += static_cast<float>(gamepadState.Gamepad.sThumbRX) / SHRT_MAX * rotationSpeed;
-				}
-				// 右スティックのY軸でX軸回転
-				if (abs(gamepadState.Gamepad.sThumbRY) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) {
-					gameObjects[0].transform.rotate.x += static_cast<float>(gamepadState.Gamepad.sThumbRY) / SHRT_MAX * rotationSpeed;
-				}
-			}
-
-			// ImGuiウィンドウ
-			ImGui::Begin("Settings");
-			{
-				// グローバル設定
-				ImGui::SeparatorText("Global Settings");
-				// ライティングモデルの選択肢に「None」を追加
-				const char* lightingItems[] = { "Lambert", "Half-Lambert", "None" };
-				ImGui::Combo("Lighting Model", &selectedLightingOption, lightingItems, IM_ARRAYSIZE(lightingItems));
-
-				// selectedLightingOptionに基づいてenableLightingとlightingModelを設定
-				if (selectedLightingOption == 2) { // Noneが選択された場合
-					// 全てのメッシュのライティングを無効にする
-					for (auto& gameObject : gameObjects) {
-						if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
-							for (auto& mesh : modelAssets[gameObject.modelAssetIndex].modelData.meshes) {
-								mesh.materialData->enableLighting = 0;
-							}
-						}
-					}
-				} else { // LambertまたはHalf-Lambertが選択された場合
-					// 全てのメッシュのライティングを有効にする
-					for (auto& gameObject : gameObjects) {
-						if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
-							for (auto& mesh : modelAssets[gameObject.modelAssetIndex].modelData.meshes) {
-								mesh.materialData->enableLighting = 1;
-							}
-						}
-					}
-					lightingSettingsData->lightingModel = selectedLightingOption; // 選択されたモデルを設定
-				}
-
-				// ライトの色を調整できるようにする
-				ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
-
-				// enableLightingが有効な場合のみ、ライトの方向を調整可能にする
-				// ここでは、最初のオブジェクトのライティング設定を代表として使用
-				if (!gameObjects.empty() && gameObjects[0].modelAssetIndex >= 0 && gameObjects[0].modelAssetIndex < modelAssets.size() &&
-					!modelAssets[gameObjects[0].modelAssetIndex].modelData.meshes.empty() &&
-					modelAssets[gameObjects[0].modelAssetIndex].modelData.meshes[0].materialData->enableLighting != 0) {
-					ImGui::SliderFloat3("Light Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
-					directionalLightData->direction = Normalize(directionalLightData->direction);
-				} else {
-					ImGui::Text("Light Direction: N/A (Lighting Disabled)");
-				}
-
-				// オーディオ設定
-				ImGui::SeparatorText("Audio Settings");
-				if (ImGui::Button("Play Alarm Sound")) {
-					SoundPlayWave(xAudio2, alarmSound);
-				}
-
-				// スプライト設定
-				ImGui::SeparatorText("Sprite Settings");
-				ImGui::Checkbox("Show Sprite", &isSpriteVisible);
-				if (isSpriteVisible) {
-					std::vector<const char*> textureNames;
-					for (const auto& asset : textureAssets) { textureNames.push_back(asset.name.c_str()); }
-					ImGui::Combo("Sprite Texture", &spriteTextureIndex, textureNames.data(), static_cast<int>(textureNames.size()));
-					ImGui::DragFloat3("Sprite Pos", &transformSprite.translate.x, 1.0f);
-
-					// スプライトのUV変換
-					ImGui::DragFloat3("Sprite UV Scale", &uvTransformSprite.scale.x, 0.01f, 0.01f, 10.0f);
-					ImGui::SliderAngle("Sprite UV Rotate Z", &uvTransformSprite.rotate.z);
-					ImGui::DragFloat3("Sprite UV Translate", &uvTransformSprite.translate.x, 0.01f);
-
-					// スプライトのサイズをテクスチャの原寸に合わせる
-					float currentSpriteWidth = static_cast<float>(textureAssets[spriteTextureIndex].metadata.width);
-					float currentSpriteHeight = static_cast<float>(textureAssets[spriteTextureIndex].metadata.height);
-
-					// 頂点バッファを再マップして更新
-					vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
-					vertexDataSprite[0].position = { 0.0f, currentSpriteHeight, 0.0f, 1.0f };   vertexDataSprite[0].texcoord = { 0.0f, 1.0f };
-					vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };      vertexDataSprite[1].texcoord = { 0.0f, 0.0f };
-					vertexDataSprite[2].position = { currentSpriteWidth, currentSpriteHeight, 0.0f, 1.0f };  vertexDataSprite[2].texcoord = { 1.0f, 1.0f };
-					vertexDataSprite[3].position = { currentSpriteWidth, 0.0f, 0.0f, 1.0f };    vertexDataSprite[3].texcoord = { 1.0f, 0.0f };
-					vertexResourceSprite->Unmap(0, nullptr);
-				}
-
-				// オブジェクト設定 (複数オブジェクト)
-				ImGui::SeparatorText("Object Settings");
-				for (int i = 0; i < gameObjects.size(); ++i) {
-					GameObject& currentGameObject = gameObjects[i];
-					ImGui::PushID(i); // 各オブジェクトのコントロールにユニークなIDをプッシュ
-					ImGui::SeparatorText(std::format("Object {}", i + 1).c_str());
-
-					std::vector<const char*> modelNames;
-					for (const auto& asset : modelAssets) { modelNames.push_back(asset.modelData.name.c_str()); }
-					ImGui::Combo("Model", &currentGameObject.modelAssetIndex, modelNames.data(), static_cast<int>(modelNames.size()));
-
-					// 選択中のモデルのマテリアルカラーを調整する
-					if (currentGameObject.modelAssetIndex >= 0 && currentGameObject.modelAssetIndex < modelAssets.size() &&
-						!modelAssets[currentGameObject.modelAssetIndex].modelData.meshes.empty() &&
-						modelAssets[currentGameObject.modelAssetIndex].modelData.meshes[0].materialData) {
-						// 最初のメッシュのマテリアルカラーをImGuiで編集可能にする
-						Material* currentMaterial = modelAssets[currentGameObject.modelAssetIndex].modelData.meshes[0].materialData;
-						ImGui::ColorEdit4("Material Color", &currentMaterial->color.x);
-
-						// Debug output for material color
-						Log(std::format("Current Model: {}, Material Color: R:{:.2f}, G:{:.2f}, B:{:.2f}, A:{:.2f}\n",
-							modelAssets[currentGameObject.modelAssetIndex].modelData.name,
-							currentMaterial->color.x, currentMaterial->color.y, currentMaterial->color.z, currentMaterial->color.w));
-					}
-
-					// オブジェクト全体の変換
-					ImGui::DragFloat3("Position", &currentGameObject.transform.translate.x, 0.1f);
-					ImGui::DragFloat3("Scale", &currentGameObject.transform.scale.x, 0.1f);
-					ImGui::SliderAngle("Rotate X", &currentGameObject.transform.rotate.x);
-					ImGui::SliderAngle("Rotate Y", &currentGameObject.transform.rotate.y);
-					ImGui::SliderAngle("Rotate Z", &currentGameObject.transform.rotate.z);
-					ImGui::PopID(); // ユニークなIDをポップ
-				}
-			}
-			ImGui::End(); // Global Settings End
-
-			// multimesh.objが選択されている場合のみMesh Settingsを表示
-			// このセクションは、最初のゲームオブジェクトがmultiMesh.objの場合にのみ表示されます。
-			if (!gameObjects.empty() && gameObjects[0].modelAssetIndex >= 0 && gameObjects[0].modelAssetIndex < modelAssets.size() &&
-				modelAssets[gameObjects[0].modelAssetIndex].modelData.name == "multiMesh.obj")
-			{
-				ImGui::Begin("Mesh Settings (Object 1)"); // 特定のオブジェクトに紐づける
-				{
-					// メッシュごとの設定
-					ModelData& currentModel = modelAssets[gameObjects[0].modelAssetIndex].modelData; // 最初のオブジェクトのモデル
-					if (!currentModel.meshes.empty()) {
-						std::vector<const char*> meshNames;
-						for (const auto& mesh : currentModel.meshes) { meshNames.push_back(mesh.name.c_str()); }
-						// selectedMeshIndexが現在のメッシュ数を超えないように調整
-						if (selectedMeshIndex >= currentModel.meshes.size()) {
-							selectedMeshIndex = 0; // 無効な場合は0番目のメッシュを選択
-						}
-						ImGui::Combo("Select Mesh", &selectedMeshIndex, meshNames.data(), static_cast<int>(meshNames.size()));
-
-						if (selectedMeshIndex >= 0 && selectedMeshIndex < currentModel.meshes.size()) {
-							MeshObject& selectedMesh = currentModel.meshes[selectedMeshIndex];
-
-							ImGui::SeparatorText(selectedMesh.name.c_str());
-							ImGui::DragFloat3("Mesh Position", &selectedMesh.transform.translate.x, 0.1f);
-							ImGui::DragFloat3("Mesh Scale", &selectedMesh.transform.scale.x, 0.1f);
-							ImGui::SliderAngle("Mesh Rotate X", &selectedMesh.transform.rotate.x);
-							ImGui::SliderAngle("Mesh Rotate Y", &selectedMesh.transform.rotate.y);
-							ImGui::SliderAngle("Mesh Rotate Z", &selectedMesh.transform.rotate.z);
-							ImGui::ColorEdit4("Mesh Color", &selectedMesh.materialData->color.x);
-
-							// メッシュがUVを持っている場合のみテクスチャ選択とUV変換を有効にする
-							if (selectedMesh.hasUV) {
-								std::vector<const char*> textureNames;
-								for (const auto& asset : textureAssets) { textureNames.push_back(asset.name.c_str()); }
-								// int から size_t に変更
-								size_t meshTexIdx = selectedMesh.textureAssetIndex;
-								ImGui::Combo("Mesh Texture", reinterpret_cast<int*>(&meshTexIdx), textureNames.data(), static_cast<int>(textureNames.size()));
-								selectedMesh.textureAssetIndex = static_cast<int>(meshTexIdx); // intに戻す
-
-								// UV変換のImGuiコントロール
-								ImGui::SeparatorText("Mesh UV Transform");
-								ImGui::DragFloat3("Mesh UV Scale", &selectedMesh.uvTransform.scale.x, 0.01f, 0.01f, 10.0f);
-								ImGui::SliderAngle("Mesh UV Rotate Z", &selectedMesh.uvTransform.rotate.z);
-								ImGui::DragFloat3("Mesh UV Translate", &selectedMesh.uvTransform.translate.x, 0.01f);
-
-							} else {
-								ImGui::Text("Mesh Texture: N/A (No UVs)");
-								ImGui::Text("Mesh UV Transform: N/A (No UVs)");
-							}
-						}
-					} else {
-						ImGui::Text("No meshes in this model.");
-					}
-				}
-				ImGui::End(); // Mesh Settings End
-			}
-
-
-			// 更新処理
-			const Matrix4x4& viewMatrix = g_debugCamera.GetViewMatrix();
-			Matrix4x4 projectionMatrix = MakePerspectiveMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-
-			// 各ゲームオブジェクトの更新
-			for (auto& gameObject : gameObjects) {
-				// オブジェクト全体のワールド行列
-				Matrix4x4 globalWorldMatrix = MakeAffineMatrix(gameObject.transform.scale, gameObject.transform.rotate, gameObject.transform.translate);
-
-				// 各メッシュの更新
-				if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
-					ModelData& currentModel = modelAssets[gameObject.modelAssetIndex].modelData;
-					for (auto& mesh : currentModel.meshes) {
-						// メッシュ固有のワールド行列
-						Matrix4x4 meshLocalWorldMatrix = MakeAffineMatrix(mesh.transform.scale, mesh.transform.rotate, mesh.transform.translate);
-						// グローバルなオブジェクト変換とメッシュ固有の変換を結合
-						Matrix4x4 finalWorldMatrix = Multiply(meshLocalWorldMatrix, globalWorldMatrix);
-
-						mesh.wvpData->World = finalWorldMatrix;
-						mesh.wvpData->WVP = Multiply(finalWorldMatrix, Multiply(viewMatrix, projectionMatrix));
-
-						// メッシュのUV変換行列を更新
-						if (mesh.hasUV) {
-							mesh.materialData->uvTransform = MakeAffineMatrix(mesh.uvTransform.scale, mesh.uvTransform.rotate, mesh.uvTransform.translate);
-						} else {
-							mesh.materialData->uvTransform = Identity4x4(); // UVがない場合は単位行列
-						}
-					}
-				}
-			}
-
-
-			if (isSpriteVisible) {
-				Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
-				Matrix4x4 viewMatrixSprite = Identity4x4();
-				Matrix4x4 projectionMatrixSprite = makeOrthographicmMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
-				wvpDataSprite->World = worldMatrixSprite;
-				wvpDataSprite->WVP = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
-
-				// スプライトのマテリアルデータを更新（毎フレーム確実に設定）
-				materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白色に設定
-				materialDataSprite->enableLighting = 0; // ライティングを無効化
-				materialDataSprite->shininess = 0.0f; // テクスチャサンプリングのために0.0f以上を設定
-				// スプライトのUV変換行列を更新
-				materialDataSprite->uvTransform = MakeAffineMatrix(uvTransformSprite.scale, uvTransformSprite.rotate, uvTransformSprite.translate);
-			}
-
-			// 描画処理
-			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
-			D3D12_RESOURCE_BARRIER barrier = {};
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-			barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			commandList->ResourceBarrier(1, &barrier);
-
-			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-			commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
-			float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
-			commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
-			commandList->ClearDepthStencilView(dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-			commandList->RSSetViewports(1, &viewport);
-			commandList->RSSetScissorRects(1, &scissorRect);
-			commandList->SetPipelineState(graphicsPipelineState.Get());
-			commandList->SetGraphicsRootSignature(rootSignature.Get());
-			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
-			commandList->SetDescriptorHeaps(1, descriptorHeaps);
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootConstantBufferView(4, lightingSettingsResource->GetGPUVirtualAddress());
-
-			// 3Dオブジェクト描画 (各ゲームオブジェクトの各メッシュをループして描画)
-			for (auto& gameObject : gameObjects) {
-				if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
-					ModelData& currentModel = modelAssets[gameObject.modelAssetIndex].modelData;
-					for (auto& mesh : currentModel.meshes) {
-						commandList->SetGraphicsRootConstantBufferView(0, mesh.materialResource->GetGPUVirtualAddress());
-						commandList->SetGraphicsRootConstantBufferView(1, mesh.wvpResource->GetGPUVirtualAddress());
-						commandList->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);
-
-						// メッシュがUVを持つか、またはマテリアルにテクスチャパスがあるかを確認
-						if (mesh.hasUV && !mesh.material.textureFilePath.empty()) {
-							// 適切なテクスチャアセットを見つけるロジック
-							size_t meshTexIdx = 0;
-							for (size_t i = 0; i < textureAssets.size(); ++i) {
-								// マテリアルのテクスチャファイルパスとテクスチャアセットの名前を比較
-								if (textureAssets[i].name == mesh.material.textureFilePath) {
-									meshTexIdx = i;
-									break;
-								}
-							}
-							commandList->SetGraphicsRootDescriptorTable(2, textureAssets[meshTexIdx].gpuHandle);
-						} else {
-							// UVがないかテクスチャが指定されていない場合はデフォルトのテクスチャ (uvchecker.png) を使用
-							commandList->SetGraphicsRootDescriptorTable(2, textureAssets[0].gpuHandle);
-						}
-						commandList->DrawInstanced(UINT(mesh.vertices.size()), 1, 0, 0);
-					}
-				}
-			}
-
-
-			// スプライト描画
-			if (isSpriteVisible) {
-				commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-				commandList->SetGraphicsRootConstantBufferView(1, wvpResourceSprite->GetGPUVirtualAddress());
-				commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-				commandList->IASetIndexBuffer(&indexBufferViewSprite);
-				commandList->SetGraphicsRootDescriptorTable(2, textureAssets[spriteTextureIndex].gpuHandle);
-				commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
-			}
-
-			// ImGui描画
-			ImGui::Render();
-			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
-
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-			commandList->ResourceBarrier(1, &barrier);
-
-			hr = commandList->Close();
-			assert(SUCCEEDED(hr));
-			ID3D12CommandList* commandLists[] = { commandList.Get() };
-			commandQueue->ExecuteCommandLists(1, commandLists);
-			swapChain->Present(1, 0);
-
-			fenceValue++;
-			commandQueue->Signal(fence.Get(), fenceValue);
-			if (fence->GetCompletedValue() < fenceValue) {
-				fence->SetEventOnCompletion(fenceValue, fenceEvent);
-				WaitForSingleObject(fenceEvent, INFINITE);
-			}
-
-			hr = commandAllocator->Reset();
-			assert(SUCCEEDED(hr));
-			hr = commandList->Reset(commandAllocator.Get(), nullptr);
-			assert(SUCCEEDED(hr));
+		if (winApp->ProcessMessage()) {
+			break;
 		}
+
+		// ImGuiフレーム開始
+		ImGui_ImplDX12_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+
+		// 入力取得
+		keyboard->Acquire();
+		mouse->Acquire();
+		BYTE keys[256] = {};
+		keyboard->GetDeviceState(sizeof(keys), keys);
+		DIMOUSESTATE2 mouseState = {};
+		mouse->GetDeviceState(sizeof(mouseState), &mouseState);
+
+		// Gamepad input
+		XINPUT_STATE gamepadState;
+		ZeroMemory(&gamepadState, sizeof(XINPUT_STATE));
+		DWORD dwResult = XInputGetState(0, &gamepadState); // Get the state of player 1's gamepad
+
+		// カメラ更新
+		g_debugCamera.Update(keys, mouseState);
+
+		// Gamepadで最初のモデルの回転を操作
+		if (dwResult == ERROR_SUCCESS && !gameObjects.empty()) // Gamepad is connected and at least one object exists
+		{
+			float rotationSpeed = 0.05f; // 回転速度
+
+			// 右スティックのX軸でY軸回転
+			if (abs(gamepadState.Gamepad.sThumbRX) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) {
+				gameObjects[0].transform.rotate.y += static_cast<float>(gamepadState.Gamepad.sThumbRX) / SHRT_MAX * rotationSpeed;
+			}
+			// 右スティックのY軸でX軸回転
+			if (abs(gamepadState.Gamepad.sThumbRY) > XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE) {
+				gameObjects[0].transform.rotate.x += static_cast<float>(gamepadState.Gamepad.sThumbRY) / SHRT_MAX * rotationSpeed;
+			}
+		}
+
+		// ImGuiウィンドウ
+		ImGui::Begin("Settings");
+		{
+			// グローバル設定
+			ImGui::SeparatorText("Global Settings");
+			// ライティングモデルの選択肢に「None」を追加
+			const char* lightingItems[] = { "Lambert", "Half-Lambert", "None" };
+			ImGui::Combo("Lighting Model", &selectedLightingOption, lightingItems, IM_ARRAYSIZE(lightingItems));
+
+			// selectedLightingOptionに基づいてenableLightingとlightingModelを設定
+			if (selectedLightingOption == 2) { // Noneが選択された場合
+				// 全てのメッシュのライティングを無効にする
+				for (auto& gameObject : gameObjects) {
+					if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
+						for (auto& mesh : modelAssets[gameObject.modelAssetIndex].modelData.meshes) {
+							mesh.materialData->enableLighting = 0;
+						}
+					}
+				}
+			}
+			else { // LambertまたはHalf-Lambertが選択された場合
+				// 全てのメッシュのライティングを有効にする
+				for (auto& gameObject : gameObjects) {
+					if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
+						for (auto& mesh : modelAssets[gameObject.modelAssetIndex].modelData.meshes) {
+							mesh.materialData->enableLighting = 1;
+						}
+					}
+				}
+				lightingSettingsData->lightingModel = selectedLightingOption; // 選択されたモデルを設定
+			}
+
+			// ライトの色を調整できるようにする
+			ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
+
+			// enableLightingが有効な場合のみ、ライトの方向を調整可能にする
+			// ここでは、最初のオブジェクトのライティング設定を代表として使用
+			if (!gameObjects.empty() && gameObjects[0].modelAssetIndex >= 0 && gameObjects[0].modelAssetIndex < modelAssets.size() &&
+				!modelAssets[gameObjects[0].modelAssetIndex].modelData.meshes.empty() &&
+				modelAssets[gameObjects[0].modelAssetIndex].modelData.meshes[0].materialData->enableLighting != 0) {
+				ImGui::SliderFloat3("Light Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
+				directionalLightData->direction = Normalize(directionalLightData->direction);
+			}
+			else {
+				ImGui::Text("Light Direction: N/A (Lighting Disabled)");
+			}
+
+			// オーディオ設定
+			ImGui::SeparatorText("Audio Settings");
+			if (ImGui::Button("Play Alarm Sound")) {
+				SoundPlayWave(xAudio2, alarmSound);
+			}
+
+			// スプライト設定
+			ImGui::SeparatorText("Sprite Settings");
+			ImGui::Checkbox("Show Sprite", &isSpriteVisible);
+			if (isSpriteVisible) {
+				std::vector<const char*> textureNames;
+				for (const auto& asset : textureAssets) { textureNames.push_back(asset.name.c_str()); }
+				ImGui::Combo("Sprite Texture", &spriteTextureIndex, textureNames.data(), static_cast<int>(textureNames.size()));
+				ImGui::DragFloat3("Sprite Pos", &transformSprite.translate.x, 1.0f);
+
+				// スプライトのUV変換
+				ImGui::DragFloat3("Sprite UV Scale", &uvTransformSprite.scale.x, 0.01f, 0.01f, 10.0f);
+				ImGui::SliderAngle("Sprite UV Rotate Z", &uvTransformSprite.rotate.z);
+				ImGui::DragFloat3("Sprite UV Translate", &uvTransformSprite.translate.x, 0.01f);
+
+				// スプライトのサイズをテクスチャの原寸に合わせる
+				float currentSpriteWidth = static_cast<float>(textureAssets[spriteTextureIndex].metadata.width);
+				float currentSpriteHeight = static_cast<float>(textureAssets[spriteTextureIndex].metadata.height);
+
+				// 頂点バッファを再マップして更新
+				vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+				vertexDataSprite[0].position = { 0.0f, currentSpriteHeight, 0.0f, 1.0f };   vertexDataSprite[0].texcoord = { 0.0f, 1.0f };
+				vertexDataSprite[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };      vertexDataSprite[1].texcoord = { 0.0f, 0.0f };
+				vertexDataSprite[2].position = { currentSpriteWidth, currentSpriteHeight, 0.0f, 1.0f };  vertexDataSprite[2].texcoord = { 1.0f, 1.0f };
+				vertexDataSprite[3].position = { currentSpriteWidth, 0.0f, 0.0f, 1.0f };    vertexDataSprite[3].texcoord = { 1.0f, 0.0f };
+				vertexResourceSprite->Unmap(0, nullptr);
+			}
+
+			// オブジェクト設定 (複数オブジェクト)
+			ImGui::SeparatorText("Object Settings");
+			for (int i = 0; i < gameObjects.size(); ++i) {
+				GameObject& currentGameObject = gameObjects[i];
+				ImGui::PushID(i); // 各オブジェクトのコントロールにユニークなIDをプッシュ
+				ImGui::SeparatorText(std::format("Object {}", i + 1).c_str());
+
+				std::vector<const char*> modelNames;
+				for (const auto& asset : modelAssets) { modelNames.push_back(asset.modelData.name.c_str()); }
+				ImGui::Combo("Model", &currentGameObject.modelAssetIndex, modelNames.data(), static_cast<int>(modelNames.size()));
+
+				// 選択中のモデルのマテリアルカラーを調整する
+				if (currentGameObject.modelAssetIndex >= 0 && currentGameObject.modelAssetIndex < modelAssets.size() &&
+					!modelAssets[currentGameObject.modelAssetIndex].modelData.meshes.empty() &&
+					modelAssets[currentGameObject.modelAssetIndex].modelData.meshes[0].materialData) {
+					// 最初のメッシュのマテリアルカラーをImGuiで編集可能にする
+					Material* currentMaterial = modelAssets[currentGameObject.modelAssetIndex].modelData.meshes[0].materialData;
+					ImGui::ColorEdit4("Material Color", &currentMaterial->color.x);
+
+					// Debug output for material color
+					Log(std::format("Current Model: {}, Material Color: R:{:.2f}, G:{:.2f}, B:{:.2f}, A:{:.2f}\n",
+						modelAssets[currentGameObject.modelAssetIndex].modelData.name,
+						currentMaterial->color.x, currentMaterial->color.y, currentMaterial->color.z, currentMaterial->color.w));
+				}
+
+				// オブジェクト全体の変換
+				ImGui::DragFloat3("Position", &currentGameObject.transform.translate.x, 0.1f);
+				ImGui::DragFloat3("Scale", &currentGameObject.transform.scale.x, 0.1f);
+				ImGui::SliderAngle("Rotate X", &currentGameObject.transform.rotate.x);
+				ImGui::SliderAngle("Rotate Y", &currentGameObject.transform.rotate.y);
+				ImGui::SliderAngle("Rotate Z", &currentGameObject.transform.rotate.z);
+				ImGui::PopID(); // ユニークなIDをポップ
+			}
+		}
+		ImGui::End(); // Global Settings End
+
+		// multimesh.objが選択されている場合のみMesh Settingsを表示
+		// このセクションは、最初のゲームオブジェクトがmultiMesh.objの場合にのみ表示されます。
+		if (!gameObjects.empty() && gameObjects[0].modelAssetIndex >= 0 && gameObjects[0].modelAssetIndex < modelAssets.size() &&
+			modelAssets[gameObjects[0].modelAssetIndex].modelData.name == "multiMesh.obj")
+		{
+			ImGui::Begin("Mesh Settings (Object 1)"); // 特定のオブジェクトに紐づける
+			{
+				// メッシュごとの設定
+				ModelData& currentModel = modelAssets[gameObjects[0].modelAssetIndex].modelData; // 最初のオブジェクトのモデル
+				if (!currentModel.meshes.empty()) {
+					std::vector<const char*> meshNames;
+					for (const auto& mesh : currentModel.meshes) { meshNames.push_back(mesh.name.c_str()); }
+					// selectedMeshIndexが現在のメッシュ数を超えないように調整
+					if (selectedMeshIndex >= currentModel.meshes.size()) {
+						selectedMeshIndex = 0; // 無効な場合は0番目のメッシュを選択
+					}
+					ImGui::Combo("Select Mesh", &selectedMeshIndex, meshNames.data(), static_cast<int>(meshNames.size()));
+
+					if (selectedMeshIndex >= 0 && selectedMeshIndex < currentModel.meshes.size()) {
+						MeshObject& selectedMesh = currentModel.meshes[selectedMeshIndex];
+
+						ImGui::SeparatorText(selectedMesh.name.c_str());
+						ImGui::DragFloat3("Mesh Position", &selectedMesh.transform.translate.x, 0.1f);
+						ImGui::DragFloat3("Mesh Scale", &selectedMesh.transform.scale.x, 0.1f);
+						ImGui::SliderAngle("Mesh Rotate X", &selectedMesh.transform.rotate.x);
+						ImGui::SliderAngle("Mesh Rotate Y", &selectedMesh.transform.rotate.y);
+						ImGui::SliderAngle("Mesh Rotate Z", &selectedMesh.transform.rotate.z);
+						ImGui::ColorEdit4("Mesh Color", &selectedMesh.materialData->color.x);
+
+						// メッシュがUVを持っている場合のみテクスチャ選択とUV変換を有効にする
+						if (selectedMesh.hasUV) {
+							std::vector<const char*> textureNames;
+							for (const auto& asset : textureAssets) { textureNames.push_back(asset.name.c_str()); }
+							// int から size_t に変更
+							size_t meshTexIdx = selectedMesh.textureAssetIndex;
+							ImGui::Combo("Mesh Texture", reinterpret_cast<int*>(&meshTexIdx), textureNames.data(), static_cast<int>(textureNames.size()));
+							selectedMesh.textureAssetIndex = static_cast<int>(meshTexIdx); // intに戻す
+
+							// UV変換のImGuiコントロール
+							ImGui::SeparatorText("Mesh UV Transform");
+							ImGui::DragFloat3("Mesh UV Scale", &selectedMesh.uvTransform.scale.x, 0.01f, 0.01f, 10.0f);
+							ImGui::SliderAngle("Mesh UV Rotate Z", &selectedMesh.uvTransform.rotate.z);
+							ImGui::DragFloat3("Mesh UV Translate", &selectedMesh.uvTransform.translate.x, 0.01f);
+
+						}
+						else {
+							ImGui::Text("Mesh Texture: N/A (No UVs)");
+							ImGui::Text("Mesh UV Transform: N/A (No UVs)");
+						}
+					}
+				}
+				else {
+					ImGui::Text("No meshes in this model.");
+				}
+			}
+			ImGui::End(); // Mesh Settings End
+		}
+
+
+		// 更新処理
+		const Matrix4x4& viewMatrix = g_debugCamera.GetViewMatrix();
+		Matrix4x4 projectionMatrix = MakePerspectiveMatrix(0.45f, float(winApp->kClientWidth) / float(winApp->kClientHeight), 0.1f, 100.0f);
+
+		// 各ゲームオブジェクトの更新
+		for (auto& gameObject : gameObjects) {
+			// オブジェクト全体のワールド行列
+			Matrix4x4 globalWorldMatrix = MakeAffineMatrix(gameObject.transform.scale, gameObject.transform.rotate, gameObject.transform.translate);
+
+			// 各メッシュの更新
+			if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
+				ModelData& currentModel = modelAssets[gameObject.modelAssetIndex].modelData;
+				for (auto& mesh : currentModel.meshes) {
+					// メッシュ固有のワールド行列
+					Matrix4x4 meshLocalWorldMatrix = MakeAffineMatrix(mesh.transform.scale, mesh.transform.rotate, mesh.transform.translate);
+					// グローバルなオブジェクト変換とメッシュ固有の変換を結合
+					Matrix4x4 finalWorldMatrix = Multiply(meshLocalWorldMatrix, globalWorldMatrix);
+
+					mesh.wvpData->World = finalWorldMatrix;
+					mesh.wvpData->WVP = Multiply(finalWorldMatrix, Multiply(viewMatrix, projectionMatrix));
+
+					// メッシュのUV変換行列を更新
+					if (mesh.hasUV) {
+						mesh.materialData->uvTransform = MakeAffineMatrix(mesh.uvTransform.scale, mesh.uvTransform.rotate, mesh.uvTransform.translate);
+					}
+					else {
+						mesh.materialData->uvTransform = Identity4x4(); // UVがない場合は単位行列
+					}
+				}
+			}
+		}
+
+
+		if (isSpriteVisible) {
+			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
+			Matrix4x4 viewMatrixSprite = Identity4x4();
+			Matrix4x4 projectionMatrixSprite = makeOrthographicmMatrix(0.0f, 0.0f, float(winApp->kClientWidth), float(winApp->kClientHeight), 0.0f, 100.0f);
+			wvpDataSprite->World = worldMatrixSprite;
+			wvpDataSprite->WVP = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+
+			// スプライトのマテリアルデータを更新（毎フレーム確実に設定）
+			materialDataSprite->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白色に設定
+			materialDataSprite->enableLighting = 0; // ライティングを無効化
+			materialDataSprite->shininess = 0.0f; // テクスチャサンプリングのために0.0f以上を設定
+			// スプライトのUV変換行列を更新
+			materialDataSprite->uvTransform = MakeAffineMatrix(uvTransformSprite.scale, uvTransformSprite.rotate, uvTransformSprite.translate);
+		}
+
+		// 描画処理
+		UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+		D3D12_RESOURCE_BARRIER barrier = {};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
+		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		commandList->ResourceBarrier(1, &barrier);
+
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
+		float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
+		commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
+		commandList->ClearDepthStencilView(dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+		commandList->RSSetViewports(1, &viewport);
+		commandList->RSSetScissorRects(1, &scissorRect);
+		commandList->SetPipelineState(graphicsPipelineState.Get());
+		commandList->SetGraphicsRootSignature(rootSignature.Get());
+		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
+		commandList->SetDescriptorHeaps(1, descriptorHeaps);
+		commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(4, lightingSettingsResource->GetGPUVirtualAddress());
+
+		// 3Dオブジェクト描画 (各ゲームオブジェクトの各メッシュをループして描画)
+		for (auto& gameObject : gameObjects) {
+			if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
+				ModelData& currentModel = modelAssets[gameObject.modelAssetIndex].modelData;
+				for (auto& mesh : currentModel.meshes) {
+					commandList->SetGraphicsRootConstantBufferView(0, mesh.materialResource->GetGPUVirtualAddress());
+					commandList->SetGraphicsRootConstantBufferView(1, mesh.wvpResource->GetGPUVirtualAddress());
+					commandList->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);
+
+					// メッシュがUVを持つか、またはマテリアルにテクスチャパスがあるかを確認
+					if (mesh.hasUV && !mesh.material.textureFilePath.empty()) {
+						// 適切なテクスチャアセットを見つけるロジック
+						size_t meshTexIdx = 0;
+						for (size_t i = 0; i < textureAssets.size(); ++i) {
+							// マテリアルのテクスチャファイルパスとテクスチャアセットの名前を比較
+							if (textureAssets[i].name == mesh.material.textureFilePath) {
+								meshTexIdx = i;
+								break;
+							}
+						}
+						commandList->SetGraphicsRootDescriptorTable(2, textureAssets[meshTexIdx].gpuHandle);
+					}
+					else {
+						// UVがないかテクスチャが指定されていない場合はデフォルトのテクスチャ (uvchecker.png) を使用
+						commandList->SetGraphicsRootDescriptorTable(2, textureAssets[0].gpuHandle);
+					}
+					commandList->DrawInstanced(UINT(mesh.vertices.size()), 1, 0, 0);
+				}
+			}
+		}
+
+
+		// スプライト描画
+		if (isSpriteVisible) {
+			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceSprite->GetGPUVirtualAddress());
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			commandList->IASetIndexBuffer(&indexBufferViewSprite);
+			commandList->SetGraphicsRootDescriptorTable(2, textureAssets[spriteTextureIndex].gpuHandle);
+			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+		}
+
+		// ImGui描画
+		ImGui::Render();
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
+
+		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+		commandList->ResourceBarrier(1, &barrier);
+
+		hr = commandList->Close();
+		assert(SUCCEEDED(hr));
+		ID3D12CommandList* commandLists[] = { commandList.Get() };
+		commandQueue->ExecuteCommandLists(1, commandLists);
+		swapChain->Present(1, 0);
+
+		fenceValue++;
+		commandQueue->Signal(fence.Get(), fenceValue);
+		if (fence->GetCompletedValue() < fenceValue) {
+			fence->SetEventOnCompletion(fenceValue, fenceEvent);
+			WaitForSingleObject(fenceEvent, INFINITE);
+		}
+
+		hr = commandAllocator->Reset();
+		assert(SUCCEEDED(hr));
+		hr = commandList->Reset(commandAllocator.Get(), nullptr);
+		assert(SUCCEEDED(hr));
 	}
+
 
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
