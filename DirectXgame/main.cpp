@@ -41,11 +41,11 @@
 #include <xaudio2.h>
 #pragma comment(lib, "xaudio2.lib")
 
-#include <dinput.h>
-#pragma comment(lib, "dinput8.lib")
-#pragma comment(lib, "dxguid.lib")
-#include <Xinput.h> // XInputのヘッダを追加
-#pragma comment(lib, "xinput.lib") // XInputのライブラリをリンク
+
+#include <Xinput.h>
+#pragma comment(lib, "xinput.lib")
+
+#include"Input.h"
 
 
 struct Vector4 { float x, y, z, w; };
@@ -640,6 +640,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	winApp->Initialize();
 	SetUnhandledExceptionFilter(ExportDump);
 
+	Input* input = nullptr;
+	input = new Input();
+	input->Initialize(hInstance,winApp->GetHwnd());
+
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
@@ -1052,18 +1056,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	// 入力とカメラ
-	Microsoft::WRL::ComPtr<IDirectInput8> directInput = nullptr;
-	DirectInput8Create(hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
 
-	Microsoft::WRL::ComPtr<IDirectInputDevice8> keyboard = nullptr;
-	directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
-	keyboard->SetDataFormat(&c_dfDIKeyboard);
-	keyboard->SetCooperativeLevel(winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
 
-	Microsoft::WRL::ComPtr<IDirectInputDevice8> mouse = nullptr;
-	directInput->CreateDevice(GUID_SysMouse, &mouse, NULL);
-	mouse->SetDataFormat(&c_dfDIMouse2);
-	mouse->SetCooperativeLevel(winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+
+
+
 
 	DebugCamera g_debugCamera;
 
@@ -1094,13 +1091,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		// 入力取得
-		keyboard->Acquire();
-		mouse->Acquire();
-		BYTE keys[256] = {};
-		keyboard->GetDeviceState(sizeof(keys), keys);
-		DIMOUSESTATE2 mouseState = {};
-		mouse->GetDeviceState(sizeof(mouseState), &mouseState);
+		input->Update();
 
 		// Gamepad input
 		XINPUT_STATE gamepadState;
@@ -1108,7 +1099,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		DWORD dwResult = XInputGetState(0, &gamepadState); // Get the state of player 1's gamepad
 
 		// カメラ更新
-		g_debugCamera.Update(keys, mouseState);
+		//g_debugCamera.Update(keys, mouseState);
 
 		// Gamepadで最初のモデルの回転を操作
 		if (dwResult == ERROR_SUCCESS && !gameObjects.empty()) // Gamepad is connected and at least one object exists
@@ -1459,5 +1450,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 
 	CloseHandle(fenceEvent);
 	CoUninitialize();
+	delete input;
+	delete winApp;
 	return 0;
 }
