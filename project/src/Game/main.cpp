@@ -8,16 +8,25 @@
 #include <strsafe.h>
 #include <dxcapi.h>
 #include <vector>
-#include "../engine/base/Math/Matrix4x4.h"
-#include "../engine/base/Math/Vector3.h"
 #include <math.h>
 #define _USE_MATH_DEFINES
 #include <fstream>
 #include <sstream>
 #include <map>
+
+#include <xaudio2.h>
+#pragma comment(lib, "xaudio2.lib")
+
+
+#include <Xinput.h>
+#pragma comment(lib, "xinput.lib")
+
 #include "../engine/Graphics/DebugCamera.h"
 #include "../engine/base/winApp.h"
 #include "../engine/io/Input.h"
+#include "../engine/base/Math/Matrix4x4.h"
+#include "../engine/base/Math/Vector3.h"
+#include "../engine/UI/ImGuiManager.h"
 // debug用のヘッダ
 #include <DbgHelp.h>
 #pragma comment(lib, "Dbghelp.lib")
@@ -34,16 +43,10 @@
 #include "../external/imgui/imgui.h"
 #include "../external/imgui/imgui_impl_dx12.h"
 #include "../external/imgui/imgui_impl_win32.h"
-
 #include "../external/DirectXTex/DirectXTex.h"
 #include "../external/DirectXTex/d3dx12.h"
 
-#include <xaudio2.h>
-#pragma comment(lib, "xaudio2.lib")
 
-
-#include <Xinput.h>
-#pragma comment(lib, "xinput.lib")
 
 
 
@@ -633,10 +636,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	winApp->Initialize();
 	SetUnhandledExceptionFilter(ExportDump);
 
+	// 入力の初期化
 	Input* input = nullptr;
 	input = new Input();
 	input->Initialize(hInstance, winApp->GetHwnd());
 
+	//imGuiの初期化
+	ImGuiManager* imGuiManager = new ImGuiManager();
+	imGuiManager->Initialize(winApp);
 
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
@@ -1038,10 +1045,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	scissorRect.top = 0; scissorRect.bottom = winApp->kClientHeight;
 
 	// ImGuiの初期化
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(winApp->GetHwnd());
 	ImGui_ImplDX12_Init(device.Get(), swapChainDesc.BufferCount,
 		rtvDesc.Format, srvDescriptorHeap.Get(),
 		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
