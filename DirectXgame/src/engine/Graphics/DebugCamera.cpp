@@ -1,6 +1,6 @@
 #include "DebugCamera.h"
-#include "Matrix4x4.h" // main.cppで使われている行列クラス
-#include"Vector3.h"
+#include "engine/base/Math/Matrix4x4.h"
+#include "engine/base/Math/Vector3.h"
 #include<cmath>
 
 

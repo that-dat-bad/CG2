@@ -8,16 +8,16 @@
 #include <strsafe.h>
 #include <dxcapi.h>
 #include <vector>
-#include "Matrix4x4.h"
-#include"Vector3.h"
+#include "engine/base/Math/Matrix4x4.h"
+#include "engine/base/Math/Vector3.h"
 #include <math.h>
 #define _USE_MATH_DEFINES
 #include <fstream>
-#include<sstream>
+#include <sstream>
 #include <map>
-#include"DebugCamera.h"
-#include "winApp.h"
-
+#include "engine/Graphics/DebugCamera.h"
+#include "engine/base/winApp.h"
+#include "engine/io/Input.h"
 // debug用のヘッダ
 #include <DbgHelp.h>
 #pragma comment(lib, "Dbghelp.lib")
@@ -31,12 +31,12 @@
 #pragma comment(lib,"dxcompiler.lib")
 
 
-#include "./externals/imgui/imgui.h"
-#include "./externals/imgui/imgui_impl_dx12.h"
-#include "./externals/imgui/imgui_impl_win32.h"
+#include "../external/imgui/imgui.h"
+#include "../external/imgui/imgui_impl_dx12.h"
+#include "../external/imgui/imgui_impl_win32.h"
 
-#include "./externals/DirectXTex/DirectXTex.h"
-#include "./externals/DirectXTex/d3dx12.h"
+#include "../external/DirectXTex/DirectXTex.h"
+#include "../external/DirectXTex/d3dx12.h"
 
 #include <xaudio2.h>
 #pragma comment(lib, "xaudio2.lib")
@@ -45,7 +45,7 @@
 #include <Xinput.h>
 #pragma comment(lib, "xinput.lib")
 
-#include"Input.h"
+
 
 
 struct Vector4 { float x, y, z, w; };
@@ -414,8 +414,7 @@ std::map<std::string, MaterialData> LoadMaterialTemplates(const std::string& dir
 		if (identifier == "newmtl") {
 			s >> currentMaterialName;
 			materials[currentMaterialName].name = currentMaterialName;
-		}
-		else if (identifier == "map_Kd" && !currentMaterialName.empty()) {
+		} else if (identifier == "map_Kd" && !currentMaterialName.empty()) {
 			std::string textureFileName;
 			s >> textureFileName;
 			materials[currentMaterialName].textureFilePath = directoryPath + "/" + textureFileName;
@@ -481,31 +480,27 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			currentMesh.transform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} }; // デフォルト変換
 			currentMesh.uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} }; // UV変換の初期化
 			currentMesh.hasUV = false; // 初期化
-		}
-		else if (identifier == "v") {
+		} else if (identifier == "v") {
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
 			position.w = 1.0f;
 			// 座標系の変換
 			position.x *= -1.0f;
 			positions.push_back(position);
-		}
-		else if (identifier == "vt") {
+		} else if (identifier == "vt") {
 			Vector2 texcoord;
 			s >> texcoord.x >> texcoord.y;
 			// V方向の反転
 			texcoord.y = 1.0f - texcoord.y;
 			texcoords.push_back(texcoord);
 			currentMesh.hasUV = true; // このメッシュはUVを持つ
-		}
-		else if (identifier == "vn") {
+		} else if (identifier == "vn") {
 			Vector3 normal;
 			s >> normal.x >> normal.y >> normal.z;
 			// 座標系の変換
 			normal.x *= -1.0f;
 			normals.push_back(normal);
-		}
-		else if (identifier == "f") {
+		} else if (identifier == "f") {
 			VertexData faceVertices[3];
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex) {
 				std::string vertexDefinition;
@@ -539,13 +534,11 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			currentMesh.vertices.push_back(faceVertices[0]);
 			currentMesh.vertices.push_back(faceVertices[2]);
 			currentMesh.vertices.push_back(faceVertices[1]);
-		}
-		else if (identifier == "mtllib") {
+		} else if (identifier == "mtllib") {
 			std::string materialFileName;
 			s >> materialFileName;
 			loadedMaterials = LoadMaterialTemplates(directoryPath, materialFileName);
-		}
-		else if (identifier == "usemtl") {
+		} else if (identifier == "usemtl") {
 			std::string materialName;
 			s >> materialName;
 			if (loadedMaterials.count(materialName)) {
@@ -642,7 +635,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 
 	Input* input = nullptr;
 	input = new Input();
-	input->Initialize(hInstance,winApp->GetHwnd());
+	input->Initialize(hInstance, winApp->GetHwnd());
 
 
 #ifdef _DEBUG
@@ -843,8 +836,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	graphicsPipelineStateDesc.pRootSignature = rootSignature.Get();
 	graphicsPipelineStateDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
 
-	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Object3D.VS.hlsl", L"vs_6_0", dxcUtils.Get(), dxcCompiler.Get(), includeHandler.Get());
-	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Object3D.PS.hlsl", L"ps_6_0", dxcUtils.Get(), dxcCompiler.Get(), includeHandler.Get());
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"./assets/shaders/Object3D.VS.hlsl", L"vs_6_0", dxcUtils.Get(), dxcCompiler.Get(), includeHandler.Get());
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"./assets/shaders/Object3D.PS.hlsl", L"ps_6_0", dxcUtils.Get(), dxcCompiler.Get(), includeHandler.Get());
 	graphicsPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
 	graphicsPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
 
@@ -889,9 +882,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	// テクスチャ読み込み
 	std::vector<TextureAsset> textureAssets;
 	std::vector<std::string> texturePaths = {
-		"resources/uvchecker.png",
-		"resources/monsterBall.png",
-		"resources/checkerBoard.png",
+		"assets/textures/uvchecker.png",
+		"assets/textures/monsterBall.png",
+		"assets/textures/checkerBoard.png",
 	};
 
 	// ImGui用に1つ予約
@@ -909,8 +902,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		// ここを修正: テクスチャがsRGBの場合、SRVのフォーマットを_SRGBにする
 		if (metadata.format == DXGI_FORMAT_R8G8B8A8_UNORM) { // 一般的なPNGのフォーマット
 			srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-		}
-		else {
+		} else {
 			srvDesc.Format = metadata.format;
 		}
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -940,7 +932,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		//"multiMaterial.obj"
 	};
 	for (const auto& filename : modelPaths) {
-		ModelData modelData = LoadObjFile("resources", filename, device.Get());
+		ModelData modelData = LoadObjFile("assets/models", filename, device.Get());
 		ModelAsset newAsset;
 		newAsset.modelData = modelData;
 		modelAssets.push_back(newAsset);
@@ -1074,7 +1066,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	assert(SUCCEEDED(hrXAudio2));
 
 	// サウンドデータの読み込み
-	SoundData alarmSound = SoundLoadWave("resources/Alarm01.wav");
+	SoundData alarmSound = SoundLoadWave("assets/sounds/Alarm01.wav");
 
 
 	// ImGuiのコンボボックスの状態を保持する変数
@@ -1135,8 +1127,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 						}
 					}
 				}
-			}
-			else { // LambertまたはHalf-Lambertが選択された場合
+			} else { // LambertまたはHalf-Lambertが選択された場合
 				// 全てのメッシュのライティングを有効にする
 				for (auto& gameObject : gameObjects) {
 					if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
@@ -1158,8 +1149,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 				modelAssets[gameObjects[0].modelAssetIndex].modelData.meshes[0].materialData->enableLighting != 0) {
 				ImGui::SliderFloat3("Light Direction", &directionalLightData->direction.x, -1.0f, 1.0f);
 				directionalLightData->direction = Normalize(directionalLightData->direction);
-			}
-			else {
+			} else {
 				ImGui::Text("Light Direction: N/A (Lighting Disabled)");
 			}
 
@@ -1276,14 +1266,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 							ImGui::SliderAngle("Mesh UV Rotate Z", &selectedMesh.uvTransform.rotate.z);
 							ImGui::DragFloat3("Mesh UV Translate", &selectedMesh.uvTransform.translate.x, 0.01f);
 
-						}
-						else {
+						} else {
 							ImGui::Text("Mesh Texture: N/A (No UVs)");
 							ImGui::Text("Mesh UV Transform: N/A (No UVs)");
 						}
 					}
-				}
-				else {
+				} else {
 					ImGui::Text("No meshes in this model.");
 				}
 			}
@@ -1315,8 +1303,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 					// メッシュのUV変換行列を更新
 					if (mesh.hasUV) {
 						mesh.materialData->uvTransform = MakeAffineMatrix(mesh.uvTransform.scale, mesh.uvTransform.rotate, mesh.uvTransform.translate);
-					}
-					else {
+					} else {
 						mesh.materialData->uvTransform = Identity4x4(); // UVがない場合は単位行列
 					}
 				}
@@ -1387,8 +1374,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 							}
 						}
 						commandList->SetGraphicsRootDescriptorTable(2, textureAssets[meshTexIdx].gpuHandle);
-					}
-					else {
+					} else {
 						// UVがないかテクスチャが指定されていない場合はデフォルトのテクスチャ (uvchecker.png) を使用
 						commandList->SetGraphicsRootDescriptorTable(2, textureAssets[0].gpuHandle);
 					}
