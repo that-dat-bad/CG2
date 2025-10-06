@@ -8,16 +8,16 @@
 #include <strsafe.h>
 #include <dxcapi.h>
 #include <vector>
-#include "engine/base/Math/Matrix4x4.h"
-#include "engine/base/Math/Vector3.h"
+#include "../engine/base/Math/Matrix4x4.h"
+#include "../engine/base/Math/Vector3.h"
 #include <math.h>
 #define _USE_MATH_DEFINES
 #include <fstream>
 #include <sstream>
 #include <map>
-#include "engine/Graphics/DebugCamera.h"
-#include "engine/base/winApp.h"
-#include "engine/io/Input.h"
+#include "../engine/Graphics/DebugCamera.h"
+#include "../engine/base/winApp.h"
+#include "../engine/io/Input.h"
 // debug用のヘッダ
 #include <DbgHelp.h>
 #pragma comment(lib, "Dbghelp.lib")
