@@ -1,1 +1,0 @@
-C:\forClass\25B\GE3,CG3\DirectXgame\project\external\DirectXTex\Bin\Desktop_2022_Win10\x64\Development\DirectXTex.lib

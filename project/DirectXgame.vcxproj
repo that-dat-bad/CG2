@@ -146,6 +146,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\engine\base\logger.cpp" />
+    <ClCompile Include="src\engine\base\WinApp.cpp" />
+    <ClCompile Include="src\engine\Graphics\DirectXCommon.cpp" />
     <ClCompile Include="src\engine\Graphics\DebugCamera.cpp" />
     <ClCompile Include="external\imgui\imgui.cpp" />
     <ClCompile Include="external\imgui\imgui_demo.cpp" />
@@ -159,9 +162,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
     </ClCompile>
-    <ClCompile Include="src\engine\base\Math\Matrix4x4.cpp" />
-    <ClCompile Include="src\engine\base\Math\Vector3.cpp" />
-    <ClCompile Include="src\engine\base\WinApp.cpp" />
+    <ClCompile Include="src\engine\base\StringUtility.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".editorconfig" />
@@ -186,6 +187,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\engine\base\logger.h" />
+    <ClInclude Include="src\engine\base\WinApp.h" />
+    <ClInclude Include="src\engine\Graphics\DirectXCommon.h" />
     <ClInclude Include="src\engine\Graphics\DebugCamera.h" />
     <ClInclude Include="external\imgui\imconfig.h" />
     <ClInclude Include="external\imgui\imgui.h" />
@@ -196,9 +200,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="external\imgui\imstb_textedit.h" />
     <ClInclude Include="external\imgui\imstb_truetype.h" />
     <ClInclude Include="src\engine\io\Input.h" />
-    <ClInclude Include="src\engine\base\Math\Matrix4x4.h" />
-    <ClInclude Include="src\engine\base\Math\Vector3.h" />
-    <ClInclude Include="src\engine\base\WinApp.h" />
+    <ClInclude Include="src\engine\base\StringUtility.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />
