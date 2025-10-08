@@ -321,3 +321,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/project/external/DirectXTex/Bin/Desktop_2022_Win10/x64/Development
