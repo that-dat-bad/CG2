@@ -3,6 +3,7 @@
 #include <dxgi1_6.h>
 #include <wrl.h>
 #include"./engine/base/WinApp.h"
+#include <array>
 class DirectXCommon
 {
 public:
@@ -27,6 +28,9 @@ public:
 	void CreateSwapChain();
 
 	//深度バッファの生成
+	void CreateDepthStencilBuffer();
+
+	//深度ステンシルビューの生成
 	void CreateDepthStencilView();
 
 	//各種デスクリプタヒープの生成
@@ -65,6 +69,8 @@ private:
 
 	static D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
 	static D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
+
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources_;
 
 	WinApp* winApp_ = nullptr;
 };
