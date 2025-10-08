@@ -64,6 +64,10 @@ private:
 	std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 2> rtvHandles_;
 	DXGI_FORMAT rtvFormat_;
 	HANDLE fenceEvent_ = nullptr;
+	D3D12_VIEWPORT viewport_{};
+
+
+
 	WinApp* winApp_ = nullptr;
 
 	//デバイスの初期化
