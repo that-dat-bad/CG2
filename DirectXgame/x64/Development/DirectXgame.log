@@ -1,0 +1,13 @@
+﻿  Input.cpp
+  WinApp.cpp
+  main.cpp
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\dinput.h: DIRECTINPUT_VERSION undefined. Defaulting to version 0x0800
+C:\forClass\25B\GE3,CG3\DirectXgame\DirectXgame\Input.h(4,9): warning C4005: 'DIRECTINPUT_VERSION': マクロが再定義されました。
+  (ソース ファイル 'main.cpp' をコンパイルしています)
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\dinput.h(48,9):
+      'DIRECTINPUT_VERSION' の以前の定義を確認してください
+  
+  main.obj : MSIL .netmodule または /GL を伴ってコンパイルされたモジュールが見つかりました。/LTCG を使用して再開始してください。リンカーのパフォーマンスを向上させるためには、コマンドラインに /LTCG を追加してください。
+  コード生成しています。
+  コード生成が終了しました。
+  DirectXgame.vcxproj -> C:\forClass\25B\GE3,CG3\DirectXgame\x64\Development\DirectXgame.exe

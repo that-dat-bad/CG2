@@ -1,6 +1,7 @@
 #include "StringUtility.h"
 #include <stringapiset.h>
 #include<string>
+#include <Windows.h>
 //string<->wstring変換
 
 namespace StringUtility {

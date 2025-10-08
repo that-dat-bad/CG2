@@ -19,7 +19,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{d1ac1215-52eb-4db7-a5ec-c06d95946ddb}</ProjectGuid>
     <RootNamespace>DirectXgame</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -123,7 +123,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_AMD64_;WIN32;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -147,6 +147,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\engine\base\logger.cpp" />
+    <ClCompile Include="src\engine\base\Math\Matrix4x4.cpp" />
+    <ClCompile Include="src\engine\base\Math\Vector3.cpp" />
     <ClCompile Include="src\engine\base\WinApp.cpp" />
     <ClCompile Include="src\engine\Graphics\DirectXCommon.cpp" />
     <ClCompile Include="src\engine\Graphics\DebugCamera.cpp" />
@@ -187,6 +189,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\engine\base\logger.h" />
+    <ClInclude Include="src\engine\base\Math\Matrix4x4.h" />
+    <ClInclude Include="src\engine\base\Math\Vector3.h" />
     <ClInclude Include="src\engine\base\WinApp.h" />
     <ClInclude Include="src\engine\Graphics\DirectXCommon.h" />
     <ClInclude Include="src\engine\Graphics\DebugCamera.h" />
