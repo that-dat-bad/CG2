@@ -22,13 +22,38 @@ public:
 
 
 	// 初期化
-	void Initialize(WinApp *winApp);
+	void Initialize(WinApp* winApp);
 
 	//描画前処理
 	void PreDraw();
 
 	//描画後処理
 	void PostDraw();
+
+
+	//--ゲッター--
+	ID3D12Device* GetDevice() { return device_.Get(); }
+	ID3D12GraphicsCommandList* GetCommandList() { return commandList_.Get(); }
+	ID3D12CommandQueue* GetCommandQueue() { return commandQueue_.Get(); }
+	ID3D12CommandAllocator* GetCommandAllocator() { return commandAllocator_.Get(); }
+	IDXGISwapChain4* GetSwapChain() { return swapChain_.Get(); }
+	ID3D12Resource* GetCurrentBackBuffer() {
+		return swapChainResources_[swapChain_->GetCurrentBackBufferIndex()].Get();
+	}
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentRTVHandle() {
+		return rtvHandles_[swapChain_->GetCurrentBackBufferIndex()];
+	}
+	ID3D12DescriptorHeap* GetSRVDescriptorHeap() { return srvDescriptorHeap_.Get(); }
+	ID3D12DescriptorHeap* GetRTVDescriptorHeap() { return rtvDescriptorHeap_.Get(); }
+	ID3D12DescriptorHeap* GetDSVDescriptorHeap() { return dsvDescriptorHeap_.Get(); }
+	ID3D12Resource* GetDepthStencilBuffer() { return depthStencilResource_.Get(); }
+	IDxcUtils* GetDxcUtils() { return dxcUtils_.Get(); }
+	IDxcCompiler3* GetDxcCompiler() { return dxcCompiler_.Get(); }
+	IDxcIncludeHandler* GetIncludeHandler() { return includeHandler_.Get(); }
+	DXGI_FORMAT GetRTVFormat() { return rtvFormat_; }
+	UINT64 GetFenceValue() { return fenceValue_; }
+
+
 
 private:
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_ = nullptr;
@@ -62,9 +87,9 @@ private:
 
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources_;
 	std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 2> rtvHandles_;
-	
+
 	DXGI_FORMAT rtvFormat_;
-	
+
 	HANDLE fenceEvent_ = nullptr;
 	UINT64 fenceValue_ = 0;
 
