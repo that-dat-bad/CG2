@@ -88,11 +88,11 @@ void DirectXCommon::PostDraw()
 	commandQueue_->ExecuteCommandLists(1, commandLists);
 	swapChain_->Present(1, 0);
 
-	fenceValue++;
-	commandQueue_->Signal(fence.Get(), fenceValue);
-	if (fence->GetCompletedValue() < fenceValue) {
-		fence->SetEventOnCompletion(fenceValue, fenceEvent);
-		WaitForSingleObject(fenceEvent, INFINITE);
+	fenceValue_++;
+	commandQueue_->Signal(fence_.Get(), fenceValue_);
+	if (fence_->GetCompletedValue() < fenceValue_) {
+		fence_->SetEventOnCompletion(fenceValue_, fenceEvent_);
+		WaitForSingleObject(fenceEvent_, INFINITE);
 	}
 
 	hr = commandAllocator_->Reset();
@@ -277,8 +277,7 @@ void DirectXCommon::CreateFence()
 	HRESULT hr;
 	// フェンスの生成
 	fence_ = nullptr;
-	uint64_t fenceValue = 0;
-	hr = device_->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
+	hr = device_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
 	assert(SUCCEEDED(hr));
 	fenceEvent_ = CreateEvent(NULL, FALSE, FALSE, NULL);
 	assert(fenceEvent_ != nullptr);

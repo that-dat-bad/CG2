@@ -62,8 +62,12 @@ private:
 
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources_;
 	std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 2> rtvHandles_;
+	
 	DXGI_FORMAT rtvFormat_;
+	
 	HANDLE fenceEvent_ = nullptr;
+	UINT64 fenceValue_ = 0;
+
 	D3D12_VIEWPORT viewport_{};
 
 
