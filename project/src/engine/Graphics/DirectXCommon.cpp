@@ -45,38 +45,62 @@ void DirectXCommon::Initialize(WinApp* winApp) {
 
 void DirectXCommon::PreDraw()
 {
+	// 描画処理
+	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = swapChainResources_[backBufferIndex].Get();
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	commandList_->ResourceBarrier(1, &barrier);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
+	commandList_->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], false, &dsvHandle);
+	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
+	commandList_->ClearRenderTargetView(rtvHandles_[backBufferIndex], clearColor, 0, nullptr);
+	commandList_->ClearDepthStencilView(dsvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	commandList_->RSSetViewports(1, &viewport_);
+	commandList_->RSSetScissorRects(1, &scissorRect_);
+	/*commandList_->SetPipelineState(graphicsPipelineState.Get());
+	commandList_->SetGraphicsRootSignature(rootSignature.Get());
+	commandList_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap_.Get() };
+	commandList_->SetDescriptorHeaps(1, descriptorHeaps);
+	commandList_->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+	commandList_->SetGraphicsRootConstantBufferView(4, lightingSettingsResource->GetGPUVirtualAddress());*/
 }
 
-//void DirectXCommon::PostDraw()
-//{
-//	// 描画処理
-//	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
-//	D3D12_RESOURCE_BARRIER barrier = {};
-//	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-//	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-//	barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
-//	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-//	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-//	commandList_->ResourceBarrier(1, &barrier);
-//
-//	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-//	commandList_->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
-//	float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
-//	commandList_->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
-//	commandList_->ClearDepthStencilView(dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-//
-//	commandList_->RSSetViewports(1, &viewport);
-//	commandList_->RSSetScissorRects(1, &scissorRect);
-//	commandList_->SetPipelineState(graphicsPipelineState.Get());
-//	commandList_->SetGraphicsRootSignature(rootSignature.Get());
-//	commandList_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-//
-//	ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
-//	commandList_->SetDescriptorHeaps(1, descriptorHeaps);
-//	commandList_->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
-//	commandList_->SetGraphicsRootConstantBufferView(4, lightingSettingsResource->GetGPUVirtualAddress());
-//
-//}
+void DirectXCommon::PostDraw()
+{
+	HRESULT hr;
+	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+	commandList_->ResourceBarrier(1, &barrier);
+
+	hr = commandList_->Close();
+	assert(SUCCEEDED(hr));
+	ID3D12CommandList* commandLists[] = { commandList_.Get() };
+	commandQueue_->ExecuteCommandLists(1, commandLists);
+	swapChain_->Present(1, 0);
+
+	fenceValue++;
+	commandQueue_->Signal(fence.Get(), fenceValue);
+	if (fence->GetCompletedValue() < fenceValue) {
+		fence->SetEventOnCompletion(fenceValue, fenceEvent);
+		WaitForSingleObject(fenceEvent, INFINITE);
+	}
+
+	hr = commandAllocator_->Reset();
+	assert(SUCCEEDED(hr));
+	hr = commandList_->Reset(commandAllocator_.Get(), nullptr);
+	assert(SUCCEEDED(hr));
+
+}
 
 void DirectXCommon::CreateDevice()
 {
@@ -262,10 +286,10 @@ void DirectXCommon::CreateFence()
 
 void DirectXCommon::SetViewport()
 {
-	D3D12_VIEWPORT viewport{};
-	viewport.Width = winApp_->kClientWidth; viewport.Height = winApp_->kClientHeight;
-	viewport.TopLeftX = 0; viewport.TopLeftY = 0;
-	viewport.MinDepth = 0.0f; viewport.MaxDepth = 1.0f;
+
+	viewport_.Width = winApp_->kClientWidth; viewport_.Height = winApp_->kClientHeight;
+	viewport_.TopLeftX = 0; viewport_.TopLeftY = 0;
+	viewport_.MinDepth = 0.0f; viewport_.MaxDepth = 1.0f;
 }
 
 void DirectXCommon::SetScissorRect()
