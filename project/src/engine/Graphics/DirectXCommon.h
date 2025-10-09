@@ -52,8 +52,13 @@ public:
 	IDxcIncludeHandler* GetIncludeHandler() { return includeHandler_.Get(); }
 	DXGI_FORMAT GetRTVFormat() { return rtvFormat_; }
 	UINT64 GetFenceValue() { return fenceValue_; }
+	HANDLE GetFenceEvent() { return fenceEvent_; }
+	ID3D12Fence *GetFence() { return fence_.Get(); }
+	D3D12_RECT GetScissorRect() { return scissorRect_; }
 
 
+	//セッター
+	void IncrementFenceValue() { fenceValue_++; }
 
 private:
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_ = nullptr;

@@ -518,6 +518,7 @@ void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData) {
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 
+	HRESULT hr;
 	WinApp* winApp = new WinApp();
 	// ウィンドウの初期化
 	winApp->Initialize();
@@ -609,7 +610,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		assert(false);
 	}
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature = nullptr;
-	hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+	hr = dxCommon->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 	assert(SUCCEEDED(hr));
 
 	// PSO
@@ -622,8 +623,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	graphicsPipelineStateDesc.pRootSignature = rootSignature.Get();
 	graphicsPipelineStateDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
 
-	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"./assets/shaders/Object3D.VS.hlsl", L"vs_6_0", dxcUtils.Get(), dxcCompiler.Get(), includeHandler.Get());
-	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"./assets/shaders/Object3D.PS.hlsl", L"ps_6_0", dxcUtils.Get(), dxcCompiler.Get(), includeHandler.Get());
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"./assets/shaders/Object3D.VS.hlsl", L"vs_6_0", dxCommon->GetDxcUtils(), dxCommon->GetDxcCompiler(), includeHandler.Get());
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"./assets/shaders/Object3D.PS.hlsl", L"ps_6_0", dxCommon->GetDxcUtils(), dxCommon->GetDxcCompiler(), includeHandler.Get());
 	graphicsPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
 	graphicsPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
 
@@ -657,7 +658,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState = nullptr;
-	hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
+	hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
 
@@ -677,8 +678,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	for (const auto& path : texturePaths) {
 		DirectX::ScratchImage mipImages = LoadTexture(path);
 		const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-		Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(device.Get(), metadata);
-		intermediateResources.push_back(UploadTextureData(textureResource.Get(), mipImages, device.Get(), commandList.Get()));
+		Microsoft::WRL::ComPtr<ID3D12Resource> textureResource = CreateTextureResource(dxCommon->GetDevice(), metadata);
+		intermediateResources.push_back(UploadTextureData(textureResource.Get(), mipImages, dxCommon->GetDevice(), dxCommon->GetCommandList()));
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 		// ここを修正: テクスチャがsRGBの場合、SRVのフォーマットを_SRGBにする
@@ -694,10 +695,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		TextureAsset newAsset;
 		newAsset.name = path;
 		newAsset.resource = textureResource;
-		newAsset.cpuHandle = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, srvIndex);
-		newAsset.gpuHandle = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, srvIndex);
+		newAsset.cpuHandle = GetCPUDescriptorHandle(dxCommon->GetSRVDescriptorHeap(), descriptorSizeSRV, srvIndex);
+		newAsset.gpuHandle = GetGPUDescriptorHandle(dxCommon->GetSRVDescriptorHeap(), descriptorSizeSRV, srvIndex);
 		newAsset.metadata = metadata; // メタデータを保存
-		device->CreateShaderResourceView(newAsset.resource.Get(), &srvDesc, newAsset.cpuHandle);
+		dxCommon->GetDevice()->CreateShaderResourceView(newAsset.resource.Get(), &srvDesc, newAsset.cpuHandle);
 		textureAssets.push_back(newAsset);
 		srvIndex++;
 	}
@@ -714,7 +715,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		//"multiMaterial.obj"
 	};
 	for (const auto& filename : modelPaths) {
-		ModelData modelData = LoadObjFile("assets/models", filename, device.Get());
+		ModelData modelData = LoadObjFile("assets/models", filename, dxCommon->GetDevice());
 		ModelAsset newAsset;
 		newAsset.modelData = modelData;
 		modelAssets.push_back(newAsset);
@@ -729,7 +730,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 
 	GameObject obj2;
 	obj2.transform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {2.0f, 0.0f, 0.0f} }; // 2つ目のオブジェクトをX軸にオフセット
-	obj2.modelAssetIndex = 2; // Teapot
+	obj2.modelAssetIndex = 1; // Teapot
 	gameObjects.push_back(obj2);
 
 	// ImGuiで選択されているメッシュのインデックス
@@ -738,8 +739,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	// スプライトの初期化
 	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	Transform uvTransformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} }; // スプライトのUV変換
-	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
-	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite = CreateBufferResource(dxCommon->GetDevice(), sizeof(VertexData) * 6);
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite = CreateBufferResource(dxCommon->GetDevice(), sizeof(uint32_t) * 6);
 	uint32_t* indexDataSprite = nullptr;
 	indexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite));
 	indexDataSprite[0] = 0; indexDataSprite[1] = 1; indexDataSprite[2] = 2;
@@ -765,7 +766,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	indexBufferViewSprite.BufferLocation = indexResourceSprite->GetGPUVirtualAddress();
 	indexBufferViewSprite.SizeInBytes = sizeof(uint32_t) * 6;
 	indexBufferViewSprite.Format = DXGI_FORMAT_R32_UINT;
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = CreateBufferResource(device.Get(), sizeof(Material));
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite = CreateBufferResource(dxCommon->GetDevice(), sizeof(Material));
 	Material* materialDataSprite = nullptr;
 	materialResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite));
 	// スプライトのマテリアルデータを初期化
@@ -774,14 +775,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	materialDataSprite->shininess = 0.0f; // テクスチャサンプリングのために0.0f以上を設定
 	materialDataSprite->uvTransform = Identity4x4(); // UV変換を単位行列に設定
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResourceSprite = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
+	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResourceSprite = CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix));
 	TransformationMatrix* wvpDataSprite = nullptr;
 	wvpResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&wvpDataSprite));
 	int spriteTextureIndex = 0;
 	bool isSpriteVisible = false;
 
 	// ライトの初期化
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = CreateBufferResource(device.Get(), sizeof(DirectionalLight));
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource = CreateBufferResource(dxCommon->GetDevice(), sizeof(DirectionalLight));
 	DirectionalLight* directionalLightData = nullptr;
 	directionalLightResource->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -789,25 +790,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	directionalLightData->intensity = 1.0f;
 
 	// ライティング設定の初期化
-	Microsoft::WRL::ComPtr<ID3D12Resource> lightingSettingsResource = CreateBufferResource(device.Get(), sizeof(LightingSettings));
+	Microsoft::WRL::ComPtr<ID3D12Resource> lightingSettingsResource = CreateBufferResource(dxCommon->GetDevice(), sizeof(LightingSettings));
 	LightingSettings* lightingSettingsData = nullptr;
 	lightingSettingsResource->Map(0, nullptr, reinterpret_cast<void**>(&lightingSettingsData));
 	lightingSettingsData->lightingModel = 0; // Lambert by default (0: Lambert, 1: Half-Lambert)
 
 	// コマンドを確定させて待つ
-	hr = commandList->Close();
+	hr = dxCommon->GetCommandList()->Close();
 	assert(SUCCEEDED(hr));
-	ID3D12CommandList* commandLists[] = { commandList.Get() };
-	commandQueue->ExecuteCommandLists(1, commandLists);
-	fenceValue++;
-	commandQueue->Signal(fence.Get(), fenceValue);
-	if (fence->GetCompletedValue() < fenceValue) {
-		fence->SetEventOnCompletion(fenceValue, fenceEvent);
-		WaitForSingleObject(fenceEvent, INFINITE);
+	ID3D12CommandList* commandLists[] = { dxCommon->GetCommandList()};
+	dxCommon->GetCommandQueue()->ExecuteCommandLists(1, commandLists);
+	//fenceValue++;
+	dxCommon->IncrementFenceValue();
+	dxCommon->GetCommandQueue()->Signal(dxCommon->GetFence(), dxCommon->GetFenceValue());
+	if (dxCommon->GetFence()->GetCompletedValue() < dxCommon->GetFenceValue()) {
+		dxCommon->GetFence()->SetEventOnCompletion(dxCommon->GetFenceValue(), dxCommon->GetFenceEvent());
+		WaitForSingleObject(dxCommon->GetFenceEvent(), INFINITE);
 	}
-	hr = commandAllocator->Reset();
+	hr = dxCommon->GetCommandAllocator()->Reset();
 	assert(SUCCEEDED(hr));
-	hr = commandList->Reset(commandAllocator.Get(), nullptr);
+	hr = dxCommon->GetCommandList()->Reset(dxCommon->GetCommandAllocator(), nullptr);
 	assert(SUCCEEDED(hr));
 
 
@@ -1091,40 +1093,40 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		}
 
 		// 描画処理
-		UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+		UINT backBufferIndex = dxCommon->GetSwapChain()->GetCurrentBackBufferIndex();
 		D3D12_RESOURCE_BARRIER barrier = {};
 		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 		barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
 		barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		commandList->ResourceBarrier(1, &barrier);
+		dxCommon->GetCommandList()->ResourceBarrier(1, &barrier);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-		commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dxCommon->GetDSVDescriptorHeap()->GetCPUDescriptorHandleForHeapStart();
+		dxCommon->GetCommandList()->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, &dsvHandle);
 		float clearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
-		commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
-		commandList->ClearDepthStencilView(dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		dxCommon->GetCommandList()->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
+		dxCommon->GetCommandList()->ClearDepthStencilView(dxCommon->GetDSVDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-		commandList->RSSetViewports(1, &viewport);
-		commandList->RSSetScissorRects(1, &scissorRect);
-		commandList->SetPipelineState(graphicsPipelineState.Get());
-		commandList->SetGraphicsRootSignature(rootSignature.Get());
-		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		dxCommon->GetCommandList()->RSSetViewports(1, &viewport);
+		dxCommon->GetCommandList()->RSSetScissorRects(1, &dxCommon->GetScissorRect());
+		dxCommon->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());
+		dxCommon->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
+		dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		ID3D12DescriptorHeap* descriptorHeaps[] = { srvDescriptorHeap.Get() };
-		commandList->SetDescriptorHeaps(1, descriptorHeaps);
-		commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
-		commandList->SetGraphicsRootConstantBufferView(4, lightingSettingsResource->GetGPUVirtualAddress());
+		ID3D12DescriptorHeap* descriptorHeaps[] = { dxCommon->GetSRVDescriptorHeap() };
+		dxCommon->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
+		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+		dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(4, lightingSettingsResource->GetGPUVirtualAddress());
 
 		// 3Dオブジェクト描画 (各ゲームオブジェクトの各メッシュをループして描画)
 		for (auto& gameObject : gameObjects) {
 			if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
 				ModelData& currentModel = modelAssets[gameObject.modelAssetIndex].modelData;
 				for (auto& mesh : currentModel.meshes) {
-					commandList->SetGraphicsRootConstantBufferView(0, mesh.materialResource->GetGPUVirtualAddress());
-					commandList->SetGraphicsRootConstantBufferView(1, mesh.wvpResource->GetGPUVirtualAddress());
-					commandList->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);
+					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, mesh.materialResource->GetGPUVirtualAddress());
+					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, mesh.wvpResource->GetGPUVirtualAddress());
+					dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);
 
 					// メッシュがUVを持つか、またはマテリアルにテクスチャパスがあるかを確認
 					if (mesh.hasUV && !mesh.material.textureFilePath.empty()) {
@@ -1137,12 +1139,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 								break;
 							}
 						}
-						commandList->SetGraphicsRootDescriptorTable(2, textureAssets[meshTexIdx].gpuHandle);
+						dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureAssets[meshTexIdx].gpuHandle);
 					} else {
 						// UVがないかテクスチャが指定されていない場合はデフォルトのテクスチャ (uvchecker.png) を使用
-						commandList->SetGraphicsRootDescriptorTable(2, textureAssets[0].gpuHandle);
+						dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureAssets[0].gpuHandle);
 					}
-					commandList->DrawInstanced(UINT(mesh.vertices.size()), 1, 0, 0);
+					dxCommon->GetCommandList()->DrawInstanced(UINT(mesh.vertices.size()), 1, 0, 0);
 				}
 			}
 		}
@@ -1150,17 +1152,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 
 		// スプライト描画
 		if (isSpriteVisible) {
-			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceSprite->GetGPUVirtualAddress());
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			commandList->IASetIndexBuffer(&indexBufferViewSprite);
-			commandList->SetGraphicsRootDescriptorTable(2, textureAssets[spriteTextureIndex].gpuHandle);
-			commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, wvpResourceSprite->GetGPUVirtualAddress());
+			dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			dxCommon->GetCommandList()->IASetIndexBuffer(&indexBufferViewSprite);
+			dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, textureAssets[spriteTextureIndex].gpuHandle);
+			dxCommon->GetCommandList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 		}
 
 		// ImGui描画
 		ImGui::Render();
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon->GetCommandList());
 
 		
 	}
@@ -1178,7 +1180,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		xAudio2->Release();
 	}
 
-	CloseHandle(fenceEvent);
+	CloseHandle(dxCommon->GetFenceEvent());
 	CoUninitialize();
 	delete input;
 	delete dxCommon;
