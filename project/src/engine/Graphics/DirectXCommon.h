@@ -31,6 +31,10 @@ public:
 	void PostDraw();
 
 
+	static D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
+	static D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
+
+
 	//--ゲッター--
 	ID3D12Device* GetDevice() { return device_.Get(); }
 	ID3D12GraphicsCommandList* GetCommandList() { return commandList_.Get(); }
@@ -55,11 +59,15 @@ public:
 	HANDLE GetFenceEvent() { return fenceEvent_; }
 	ID3D12Fence *GetFence() { return fence_.Get(); }
 	D3D12_RECT GetScissorRect() { return scissorRect_; }
-
+	D3D12_VIEWPORT GetViewport() { return viewport_; }
+	IDxcIncludeHandler* GetDxcIncludeHandler() { return includeHandler_.Get(); }
+	uint32_t GetSRVDescriptorSize() { return srvDescriptorSize_; }
 
 	//セッター
 	void IncrementFenceValue() { fenceValue_++; }
 
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(size_t sizeInBytes);
 private:
 	Microsoft::WRL::ComPtr<IDXGIFactory7> dxgiFactory_ = nullptr;
 	Microsoft::WRL::ComPtr<IDXGIAdapter4> useAdapter_ = nullptr;
@@ -140,11 +148,12 @@ private:
 	//ImGuiの初期化
 	void InitializeImGui();
 
+
+
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE GetSRVCPUDescriptorHandle(uint32_t index);
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
 
-	static D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
-	static D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
+
 };
