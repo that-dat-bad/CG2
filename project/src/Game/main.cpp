@@ -665,9 +665,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 	// テクスチャ読み込み
 	std::vector<TextureAsset> textureAssets;
 	std::vector<std::string> texturePaths = {
-		"assets/textures/uvchecker.png",
-		"assets/textures/monsterBall.png",
-		"assets/textures/checkerBoard.png",
+		"../assets/textures/uvchecker.png",
+		"../assets/textures/monsterBall.png",
+		"../assets/textures/checkerBoard.png",
 	};
 
 	// ImGui用に1つ予約
@@ -1084,6 +1084,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 			if (gameObject.modelAssetIndex >= 0 && gameObject.modelAssetIndex < modelAssets.size()) {
 				ModelData& currentModel = modelAssets[gameObject.modelAssetIndex].modelData;
 				for (auto& mesh : currentModel.meshes) {
+					if (mesh.vertices.empty()) {
+						continue; // 頂点がなければこのメッシュの描画をスキップ
+					}
 					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, mesh.materialResource->GetGPUVirtualAddress());
 					dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(1, mesh.wvpResource->GetGPUVirtualAddress());
 					dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);

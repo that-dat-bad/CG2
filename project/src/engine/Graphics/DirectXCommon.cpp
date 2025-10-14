@@ -78,10 +78,13 @@ void DirectXCommon::PostDraw()
 	HRESULT hr;
 	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
 	D3D12_RESOURCE_BARRIER barrier = {};
+
+
+	barrier.Transition.pResource = swapChainResources_[backBufferIndex].Get();
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-	commandList_->ResourceBarrier(1, &barrier);
 
+	commandList_->ResourceBarrier(1, &barrier);
 	hr = commandList_->Close();
 	assert(SUCCEEDED(hr));
 	ID3D12CommandList* commandLists[] = { commandList_.Get() };
@@ -137,11 +140,12 @@ void DirectXCommon::CreateDevice()
 	//デバッグレイヤー
 #ifdef _DEBUG
 	Microsoft::WRL::ComPtr<ID3D12Debug1> debugController = nullptr;
-	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+	if (FAILED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 	{
-		debugController->EnableDebugLayer();
-		debugController->SetEnableGPUBasedValidation(TRUE);
+		assert(false);
 	}
+	debugController->EnableDebugLayer();
+	debugController->SetEnableGPUBasedValidation(TRUE);
 #endif
 
 	// DXGIファクトリーの生成
