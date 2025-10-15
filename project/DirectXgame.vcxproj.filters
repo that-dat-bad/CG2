@@ -71,7 +71,6 @@
     <None Include=".editorconfig">
       <Filter>リソース ファイル</Filter>
     </None>
-    <None Include="assets\shaders\Object3d.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="assets\shaders\Object3d.VS.hlsl" />
