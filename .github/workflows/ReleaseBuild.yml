@@ -7,7 +7,7 @@ on:
       
 env:
       #リポジトリのルートディレクトリを起点としたソリューションファイルのパス
-      SOLUTION_FILE_PATH: DirectXgame.sln
+      SOLUTION_FILE_PATH:  project/DirectXgame.sln
       #Visual Studioの構成
       CONFIGURATION: Release
 
