@@ -148,8 +148,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\engine\base\logger.cpp" />
     <ClCompile Include="src\engine\base\Math\Matrix4x4.cpp" />
     <ClCompile Include="src\engine\base\Math\Vector3.cpp" />
+    <ClCompile Include="src\engine\base\StringUtility.cpp" />
     <ClCompile Include="src\engine\base\WinApp.cpp" />
     <ClCompile Include="src\engine\Graphics\DirectXCommon.cpp" />
     <ClCompile Include="src\engine\Graphics\DebugCamera.cpp" />
